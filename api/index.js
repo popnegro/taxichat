@@ -6,47 +6,59 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const { MercadoPagoConfig, Preference } = require('mercadopago');
 
-// Modelos
 const Empresa = require('../models/Empresa');
 const Viaje = require('../models/Viaje');
 
 const app = express();
-
-// --- MIDDLEWARES (Orden Crítico) ---
 app.use(express.json());
+const path = require('path');
 app.use(cors());
 
-// Permitir iframes (Debe ir antes de las rutas)
+// Cabecera para permitir Iframes en otros dominios
 app.use((req, res, next) => {
     res.setHeader("Content-Security-Policy", "frame-ancestors *");
     next();
 });
 
-// Conexión a MongoDB con Caché
-let cachedDb = null;
-async function connectToDatabase() {
-    if (cachedDb) return cachedDb;
-    const db = await mongoose.connect(process.env.MONGO_URI);
-    cachedDb = db;
-    return db;
+// ✅ SERVIR ARCHIVOS ESTÁTICOS EN LOCAL
+app.use(express.static(path.join(__dirname, '../public')));
+
+// Ruta opcional para forzar que la raíz sea index.html
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '../public/index.html'));
+});
+
+// Conexión MongoDB con Seed de Slugs
+let isConnected = false;
+async function connectDB() {
+    if (isConnected) return;
+    await mongoose.connect(process.env.MONGO_URI);
+    isConnected = true;
+
+    // Crear Slugs iniciales si la DB está vacía
+    const slugsBase = [
+        { nombre: "Taxichat Base", slug: "default", config: { color: "#2563eb", mpToken: "" } },
+        { nombre: "Taxi Mendoza", slug: "mendoza", config: { color: "#10b981", mpToken: "" } }
+    ];
+
+    for (const s of slugsBase) {
+        const existe = await Empresa.findOne({ slug: s.slug });
+        if (!existe) await Empresa.create(s);
+    }
 }
 
 app.use(async (req, res, next) => {
-    try {
-        await connectToDatabase();
-        next();
-    } catch (err) {
-        res.status(500).json({ error: "Error de conexión a base de datos" });
-    }
+    await connectDB();
+    next();
 });
 
-// --- SOCKET.IO SETUP ---
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
-    cors: { origin: "*" },
-    path: '/api/socket'
+    path: '/api/socket',
+    cors: { origin: "*" }
 });
 
+// --- LÓGICA DE SOCKETS ---
 io.on('connection', (socket) => {
     const { empresaId } = socket.handshake.query;
     if (empresaId) socket.join(empresaId);
@@ -59,102 +71,56 @@ io.on('connection', (socket) => {
 
     socket.on('confirmar-viaje', async (data) => {
         const v = await Viaje.findByIdAndUpdate(data.viajeId, { 
-            chofer: data.chofer, estado: 'confirmado' 
+            chofer: data.chofer, tiempoEstimado: data.tiempoEstimado, estado: 'confirmado' 
         }, { new: true });
         if (v) io.to(v.socketIdCliente).emit('confirmacion-cliente', v);
     });
 });
 
 // --- RUTAS API ---
-
-// Configuración de Empresa por Slug (Público)
 app.get('/api/config/:slug', async (req, res) => {
-    const empresa = await Empresa.findOne({ slug: req.params.slug });
+    let empresa = await Empresa.findOne({ slug: req.params.slug });
+    if (!empresa) empresa = await Empresa.findOne({ slug: 'default' });
     res.json(empresa);
 });
 
-// Crear Empresa (Faltaba esta ruta)
-app.post('/api/empresas', async (req, res) => {
-    try {
-        const nueva = new Empresa(req.body);
-        await nueva.save();
-        res.json(nueva);
-    } catch (error) {
-        res.status(500).json({ error: "Error al crear empresa" });
-    }
-});
-
-// SuperAdmin: Listar
 app.get('/api/superadmin/empresas', async (req, res) => {
-    try {
-        const empresas = await Empresa.find().sort({ fechaRegistro: -1 });
-        res.json(empresas);
-    } catch (error) {
-        res.status(500).json({ error: "Error al listar empresas" });
-    }
+    const empresas = await Empresa.find().sort({ fechaRegistro: -1 });
+    res.json(empresas);
 });
 
-// SuperAdmin: Editar
-app.put('/api/superadmin/empresas/:id', async (req, res) => {
-    try {
-        const empresaActualizada = await Empresa.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        res.json(empresaActualizada);
-    } catch (error) {
-        res.status(500).json({ error: "Error al actualizar" });
-    }
-});
-
-// SuperAdmin: Eliminar
-app.delete('/api/superadmin/empresas/:id', async (req, res) => {
-    try {
-        await Empresa.findByIdAndDelete(req.params.id);
-        await Viaje.deleteMany({ empresaId: req.params.id });
-        res.json({ message: "Eliminado correctamente" });
-    } catch (error) {
-        res.status(500).json({ error: "Error al eliminar" });
-    }
-});
-
-// Mercado Pago: Generar Link
 app.post('/api/pagos/crear-link', async (req, res) => {
     const { viajeId, monto, empresaId } = req.body;
     try {
         const empresa = await Empresa.findById(empresaId);
-        if (!empresa || !empresa.config.mpToken) {
-            return res.status(400).json({ error: "Mercado Pago no configurado" });
-        }
-
         const client = new MercadoPagoConfig({ accessToken: empresa.config.mpToken });
         const preference = new Preference(client);
-
         const result = await preference.create({
             body: {
-                items: [{
-                    title: `Viaje taxichat`,
-                    quantity: 1,
-                    unit_price: Number(monto),
-                    currency_id: 'ARS'
-                }],
-                back_urls: { success: `https://${req.headers.host}/pago-exitoso.html` },
+                items: [{ title: `Viaje Taxichat`, quantity: 1, unit_price: Number(monto), currency_id: 'ARS' }],
+                back_urls: { success: `https://${req.headers.host}/pago-exitoso` },
                 auto_return: "approved",
             }
         });
-
-        const viaje = await Viaje.findById(viajeId);
-        if (viaje) {
-            io.to(viaje.socketIdCliente).emit('recibir-pago', {
-                link: result.init_point,
-                monto: monto
-            });
-        }
-
         res.json({ link: result.init_point });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- EXPORT PARA VERCEL (Siempre al final) ---
+// Exportación para Vercel
+// --- ENCENDIDO DEL SERVIDOR (Solo para Local) ---
+const PORT = process.env.PORT || 3000;
+
+if (process.env.NODE_ENV !== 'production') {
+    httpServer.listen(PORT, () => {
+        console.log(`-----------------------------------------`);
+        console.log(`🚀 SERVIDOR ENCENDIDO EN LOCAL`);
+        console.log(`📍 URL: http://localhost:${PORT}`);
+        console.log(`📂 Archivos estáticos en: /public`);
+        console.log(`-----------------------------------------`);
+    });
+}
+
+// Exportación para Vercel
 module.exports = (req, res) => {
     if (!res.socket.server.io) {
         res.socket.server.io = io;
