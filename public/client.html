@@ -2,198 +2,51 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>taxichat - Pasajero</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>TaxiChat - Cliente</title>
     <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <style>
-        :root { --brand: #2563eb; }
-        body { font-family: 'Inter', sans-serif; }
-        .bg-brand { background-color: var(--brand); }
-        .text-brand { color: var(--brand); }
-        .border-brand { border-color: var(--brand); }
-        .pulse { animation: pulse 2s infinite; }
-        @keyframes pulse {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.05); opacity: 0.8; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-    </style>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
-<body class="bg-slate-100 min-h-screen flex items-center justify-center p-4">
+<body>
+    <div id="app">Cargando sistema...</div>
 
-    <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-200">
-        <div id="header-bg" class="bg-brand p-8 text-white text-center transition-colors duration-500">
-            <img id="logo-img" src="" class="h-14 mx-auto mb-3 hidden object-contain" alt="Logo">
-            <h1 id="empresa-nombre" class="text-2xl font-black tracking-tight">taxichat</h1>
-            <p class="text-blue-100 text-xs font-bold uppercase tracking-widest mt-1 opacity-80">Solicitud de Viaje</p>
-        </div>
-
-        <div class="p-8 space-y-5">
-            <div class="space-y-4" id="form-pedir">
-                <div>
-                    <label class="block text-xs font-black uppercase text-slate-400 mb-2 ml-1">Tu Nombre</label>
-                    <input type="text" id="userName" class="w-full px-5 py-4 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-blue-100 focus:border-brand outline-none transition-all font-medium" placeholder="Ej: Juan Pérez">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-black uppercase text-slate-400 mb-2 ml-1">Origen</label>
-                    <input type="text" id="origin" readonly class="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50 text-slate-400 text-sm cursor-not-allowed font-medium" placeholder="Detectando ubicación...">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-black uppercase text-slate-400 mb-2 ml-1">¿A dónde vas?</label>
-                    <input type="text" id="destination" class="w-full px-5 py-4 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-blue-100 focus:border-brand outline-none transition-all font-medium" placeholder="Ingresa destino">
-                </div>
-
-                <div id="estimate-box" class="bg-blue-50 p-4 rounded-2xl text-blue-700 text-sm font-bold text-center hidden border border-blue-100"></div>
-
-                <button id="btnRequest" onclick="solicitarTaxi()" class="bg-brand w-full py-5 text-white font-black rounded-2xl shadow-xl shadow-blue-200 hover:opacity-90 active:scale-[0.97] transition-all uppercase tracking-wider text-sm">
-                    Pedir Taxi Ahora
-                </button>
-            </div>
-
-            <div id="status-panel" class="hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div class="p-5 bg-slate-50 rounded-[2rem] border border-slate-100 relative overflow-hidden">
-                    <div class="absolute top-0 left-0 w-1 h-full bg-brand"></div>
-                    <p class="text-[10px] uppercase text-slate-400 font-black mb-2 tracking-widest">Estado del viaje</p>
-                    <p id="driver-info" class="text-slate-800 font-bold leading-relaxed pulse">Buscando el chofer más cercano...</p>
-                    
-                    <div id="payment-area" class="mt-4 hidden">
-                        </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-<script>
-    let socket;
-    let empresaId = null;
-    let slug = new URLSearchParams(window.location.search).get('v') || 'default';
-
-    // 1. Inicialización de Marca Blanca
-    async function inicializarSaaS() {
-    try {
-        console.log("Iniciando conexión con el núcleo...");
-        
-        const respuesta = await fetch('/api/config/default');
-        
-        // Si la API falla (500), creamos un objeto de respaldo (fallback)
+    <script>
         let config = {};
-        if (respuesta.ok) {
-            config = await respuesta.json();
-        } else {
-            console.warn("Servidor no respondió. Usando configuración de emergencia.");
-        }
+        let socket;
 
-        // --- SOLUCIÓN AL TYPEERROR (Línea 93) ---
-        // Definimos valores seguros para evitar el error de 'reading color'
-        const colorApp = config?.tema?.color || '#FFD700'; // Amarillo taxi por defecto
-        const clientId = config?.googleClientId || '';
+        async function inicializarSaaS() {
+            try {
+                console.log("Iniciando conexión con el núcleo...");
+                const respuesta = await fetch('/api/config/default');
+                config = await respuesta.json();
 
-        // Inicialización del Socket con el path correcto y protección de datos
-        // Esta es tu línea 93 corregida:
-        const socket = io({ 
-            path: '/api/socket',
-            auth: {
-                color: colorApp,
-                version: '1.0.0'
+                // 1. Evitar error de color (Línea 93 protegida)
+                const colorApp = config?.tema?.color || '#FFD700';
+                
+                // 2. Inicializar Socket con path corregido
+                socket = io({ 
+                    path: '/api/socket',
+                    addTrailingSlash: false,
+                    transports: ['polling', 'websocket'],
+                    auth: { color: colorApp }
+                });
+
+                socket.on('connect', () => console.log("✅ Socket conectado"));
+
+                // 3. Cargar Maps dinámicamente
+                if (config.googleMapsKey) {
+                    const script = document.createElement('script');
+                    script.src = `https://maps.googleapis.com/maps/api/js?key=${config.googleMapsKey}`;
+                    document.head.appendChild(script);
+                }
+
+                document.getElementById('app').innerText = "SaaS inicializado correctamente.";
+
+            } catch (error) {
+                console.error("Error de inicialización:", error);
             }
-        });
-
-        // Configuración dinámica de Google Login si el elemento existe
-        const googleDiv = document.getElementById('g_id_onload');
-        if (googleDiv && clientId) {
-            googleDiv.setAttribute('data-client_id', clientId);
         }
 
-        // Carga dinámica de Google Maps
-        if (config.googleMapsKey) {
-            const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${config.googleMapsKey}&libraries=places`;
-            document.head.appendChild(script);
-        }
-
-        console.log("SaaS inicializado correctamente.");
-
-    } catch (error) {
-        // Este bloque atrapa cualquier error y evita que la consola se llene de TypeErrors
-        console.error("Error crítico de inicialización:", error.message);
-        
-        // Intentar conectar el socket de forma básica si todo lo demás falla
-        if (typeof io !== 'undefined') {
-            window.socket = io({ path: '/api/socket' });
-        }
-    }
-}
-
-    // 2. Lógica de Sockets
-    function configurarEscuchas() {
-        socket.on('confirmacion-cliente', (data) => {
-            const driverInfo = document.getElementById('driver-info');
-            driverInfo.classList.remove('pulse');
-            driverInfo.innerHTML = `
-                <span class="text-brand text-xl">🚕</span><br>
-                ¡Viaje confirmado!<br>
-                <span class="text-lg text-slate-900">${data.chofer}</span><br>
-                <span class="text-sm font-normal text-slate-500 italic">Llega en ${data.tiempoEstimado || 'unos'} min</span>
-            `;
-        });
-
-        socket.on('recibir-pago', (data) => {
-            const area = document.getElementById('payment-area');
-            area.classList.remove('hidden');
-            area.innerHTML = `
-                <div class="mt-4 pt-4 border-t border-slate-200">
-                    <p class="text-xs font-bold text-slate-400 mb-3 uppercase">Pago pendiente</p>
-                    <a href="${data.link}" target="_blank" class="block w-full bg-[#009ee3] text-white text-center py-3 rounded-xl font-black text-sm transition hover:bg-[#008ad0] shadow-lg shadow-blue-100">
-                        PAGAR $${data.monto} CON MERCADO PAGO
-                    </a>
-                </div>
-            `;
-        });
-    }
-
-    // 3. Solicitar Taxi
-    function solicitarTaxi() {
-        const user = document.getElementById('userName').value;
-        const dest = document.getElementById('destination').value;
-        const origin = document.getElementById('origin').value;
-        
-        if (!user || !dest) return alert("Completa tu nombre y destino");
-
-        document.getElementById('status-panel').classList.remove('hidden');
-        document.getElementById('form-pedir').classList.add('opacity-50', 'pointer-events-none');
-        document.getElementById('btnRequest').innerText = "PROCESANDO...";
-        
-        socket.emit('nuevo-pedido', { 
-            usuario: user, 
-            destino: dest,
-            origen: origin,
-            timestamp: new Date().getTime()
-        });
-    }
-
-    // 4. Ubicación simulada (o real)
-    function detectLocation() {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(p => {
-                document.getElementById('origin').value = "Mi ubicación actual";
-            }, () => {
-                document.getElementById('origin').value = "Mendoza, Argentina";
-            });
-        }
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        const nameInput = document.getElementById('userName');
-        nameInput.value = localStorage.getItem('userTaxiName') || '';
-        nameInput.addEventListener('input', () => localStorage.setItem('userTaxiName', nameInput.value));
-        
-        detectLocation();
-        inicializarSaaS();
-    });
-</script>
+        window.onload = inicializarSaaS;
+    </script>
 </body>
 </html>
