@@ -1,0 +1,141 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+
+:root {
+    --primary: #facc15;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+}
+
+/* --- UTILITIES & BRANDING --- */
+.bg-primary { background-color: var(--primary) !important; }
+.text-primary { color: var(--primary) !important; }
+.border-primary { border-color: var(--primary) !important; }
+
+.step-hidden { display: none; }
+
+/* --- MARQUEE --- */
+@keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+}
+
+.animate-marquee {
+    display: flex;
+    animation: marquee 30s linear infinite;
+}
+
+.logo-item {
+    flex-shrink: 0;
+    padding: 0 2rem;
+    font-size: 1.5rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    font-style: italic;
+    letter-spacing: -0.05em;
+    color: #0f172a;
+    opacity: 0.2;
+    transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@media (min-width: 768px) {
+    .logo-item { font-size: 2.5rem; }
+}
+
+.logo-item:hover { opacity: 1; color: var(--primary); transform: scale(1.1) skewX(-5deg); }
+
+/* --- MAPA & UI --- */
+#map {
+    width: 100%;
+    height: 220px;
+    border-radius: 1.5rem;
+    border: 4px solid black;
+    z-index: 10;
+    background: #f8fafc;
+}
+
+@media (min-width: 768px) {
+    #map { height: 320px; border-radius: 2.5rem; }
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in { animation: fadeIn 0.6s ease-out forwards; }
+
+@keyframes spin-slow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+.animate-spin-slow { animation: spin-slow 12s linear infinite; }
+
+/* --- SCANNER (Coverage Section) --- */
+@keyframes scan {
+    0% { top: 0%; opacity: 0; }
+    30% { opacity: 1; }
+    70% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+}
+.animate-scan {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: var(--primary);
+    box-shadow: 0 0 15px var(--primary);
+    animation: scan 4s linear infinite;
+    z-index: 20;
+}
+
+/* --- MOBILE OPTIMIZATION --- */
+@media (max-width: 640px) {
+    h1 {
+        font-size: 3.2rem !important;
+        line-height: 0.8 !important;
+        letter-spacing: -0.05em !important;
+    }
+
+    h2 { font-size: 2.2rem !important; }
+
+    /* Mejora de inputs para evitar zoom en iOS y mejorar UX */
+    input[type="text"], 
+    input[type="tel"], 
+    select {
+        font-size: 16px !important; 
+        padding: 1.2rem !important;
+        border: 2px solid #e2e8f0 !important;
+    }
+
+    input:focus {
+        border-color: var(--primary) !important;
+        outline: none;
+    }
+
+    /* Dashboard en mobile: apilado */
+    #admin-panel .grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .p-8 { padding: 1.5rem !important; }
+}
+
+/* --- DASHBOARD REFINEMENTS --- */
+#admin-panel h4 {
+    transition: all 0.3s ease;
+}
+
+.stat-card-update {
+    animation: pulse-update 0.5s ease;
+}
+
+@keyframes pulse-update {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); color: var(--primary); }
+    100% { transform: scale(1); }
+}

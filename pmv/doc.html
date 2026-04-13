@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentación Técnica | TaxiGO Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=JetBrains+Mono&display=swap');
+        
+        :root {
+            scroll-behavior: smooth;
+        }
+
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            color: #1e293b; 
+            line-height: 1.6;
+        }
+
+        code { 
+            font-family: 'JetBrains Mono', monospace; 
+            font-size: 0.85em; 
+            background: #f1f5f9;
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.25rem;
+            color: #0f172a;
+        }
+        
+        .sidebar-item {
+            transition: all 0.2s ease;
+        }
+
+        .sidebar-item:hover { 
+            background-color: #f1f5f9; 
+            color: #0284c7;
+        }
+
+        .sidebar-active { 
+            background-color: #f0f9ff; 
+            color: #0284c7; 
+            border-right: 4px solid #0284c7; 
+        }
+        
+        .prose pre {
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            border: 1px solid #1e293b;
+        }
+
+        .prose pre code {
+            background: transparent;
+            color: inherit;
+            padding: 0;
+        }
+        
+        .callout {
+            border-left-width: 4px;
+            padding: 1.25rem 1.5rem;
+            margin: 2rem 0;
+            border-radius: 0.75rem;
+        }
+
+        section {
+            padding-top: 4rem;
+            margin-top: -2rem;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-white">
+
+    <nav class="fixed top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-slate-200">
+        <div class="px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div class="bg-yellow-400 p-1.5 rounded-lg shadow-sm">
+                    <i data-lucide="taxi" class="w-5 h-5 text-black"></i>
+                </div>
+                <span class="font-extrabold text-xl tracking-tighter uppercase italic text-slate-900">
+                    TaxiGO <span class="text-slate-400 font-normal italic">Docs</span>
+                </span>
+            </div>
+            <div class="flex items-center gap-6 text-sm font-semibold text-slate-600">
+                <a href="#" class="hover:text-black transition-colors">v2.0.26</a>
+                <a href="https://github.com" target="_blank" class="hover:text-black transition-colors flex items-center gap-1">
+                    <i data-lucide="github" class="w-4 h-4"></i> GitHub
+                </a>
+                <a href="#" class="bg-black text-white px-5 py-2.5 rounded-full text-xs hover:bg-slate-800 transition-all shadow-lg shadow-slate-200">
+                    Soporte Técnico
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="flex">
+        <aside class="w-64 fixed top-16 bottom-0 bg-slate-50 border-r border-slate-200 overflow-y-auto hidden md:block">
+            <div class="p-8 space-y-10">
+                <div>
+                    <h5 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-5">Introducción</h5>
+                    <ul class="space-y-1 text-sm font-semibold">
+                        <li><a href="#welcome" class="nav-link block p-2 rounded-lg sidebar-active">Bienvenido</a></li>
+                        <li><a href="#quickstart" class="nav-link block p-2 rounded-lg sidebar-item text-slate-600">Quick Start</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h5 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-5">Core Engine</h5>
+                    <ul class="space-y-1 text-sm font-semibold text-slate-600">
+                        <li><a href="#geo" class="nav-link block p-2 rounded-lg sidebar-item">Geolocalización MZA</a></li>
+                        <li><a href="#pricing" class="nav-link block p-2 rounded-lg sidebar-item">Lógica de Precios</a></li>
+                        <li><a href="#maps" class="nav-link block p-2 rounded-lg sidebar-item">Integración Mapas</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h5 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-5">Endpoints & Data</h5>
+                    <ul class="space-y-1 text-sm font-semibold text-slate-600">
+                        <li><a href="#whatsapp" class="nav-link block p-2 rounded-lg sidebar-item">WhatsApp Deep Link</a></li>
+                        <li><a href="#storage" class="nav-link block p-2 rounded-lg sidebar-item">Local Storage</a></li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
+
+        <main class="flex-1 md:ml-64 p-8 md:p-20">
+            <div class="max-w-4xl mx-auto">
+                
+                <section id="welcome">
+                    <span class="text-blue-600 font-bold text-xs uppercase tracking-widest">Documentación Oficial</span>
+                    <h1 class="text-5xl font-extrabold tracking-tight text-slate-900 mt-4 mb-6 leading-tight">Implementación del Widget TaxiGO Mendoza</h1>
+                    <p class="text-xl text-slate-500 leading-relaxed mb-10">
+                        Aprende a integrar y configurar el motor de transporte inteligente diseñado para operar en el ecosistema urbano del Gran Mendoza. 
+                        Nuestra arquitectura prioriza la velocidad de conversión y la precisión geográfica.
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
+                        <div class="p-8 border border-slate-200 rounded-[2rem] hover:border-yellow-400 hover:shadow-xl hover:shadow-yellow-400/5 transition-all cursor-pointer group">
+                            <div class="bg-yellow-50 w-12 h-12 rounded-xl flex items-center justify-center mb-6 group-hover:bg-yellow-400 transition-colors">
+                                <i data-lucide="zap" class="text-yellow-600 group-hover:text-black transition-colors"></i>
+                            </div>
+                            <h3 class="font-bold text-lg text-slate-900 mb-2">Instalación 2m</h3>
+                            <p class="text-sm text-slate-500 leading-relaxed">Copia el snippet base y activa el servicio en cualquier sitio web de forma inmediata.</p>
+                        </div>
+                        <div class="p-8 border border-slate-200 rounded-[2rem] hover:border-blue-400 hover:shadow-xl hover:shadow-blue-400/5 transition-all cursor-pointer group">
+                            <div class="bg-blue-50 w-12 h-12 rounded-xl flex items-center justify-center mb-6 group-hover:bg-blue-400 transition-colors">
+                                <i data-lucide="map" class="text-blue-600 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <h3 class="font-bold text-lg text-slate-900 mb-2">Geofencing Pro</h3>
+                            <p class="text-sm text-slate-500 leading-relaxed">Filtros geográficos avanzados para asegurar pedidos dentro de la jurisdicción Mendoza.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="quickstart">
+                    <h2 class="text-3xl font-bold text-slate-900 mb-6">Quick Start</h2>
+                    <p class="text-slate-600 mb-6">Integra las dependencias fundamentales para habilitar el renderizado de mapas e iconos vectoriales:</p>
+                    
+                    <pre><code>&lt;!-- TaxiGO Core Stack --&gt;
+&lt;script src="https://cdn.tailwindcss.com"&gt;&lt;/script&gt;
+&lt;script src="https://unpkg.com/lucide@latest"&gt;&lt;/script&gt;
+&lt;link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /&gt;
+&lt;script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"&gt;&lt;/script&gt;</code></pre>
+
+                    <div class="callout bg-blue-50 border-blue-500 text-blue-800">
+                        <div class="flex items-center gap-2 mb-2">
+                            <i data-lucide="shield-check" class="w-5 h-5"></i>
+                            <span class="font-bold text-xs uppercase tracking-widest">Requisito de Seguridad</span>
+                        </div>
+                        <p class="text-sm">Por políticas de privacidad de los navegadores modernos, la función <code>navigator.geolocation</code> solo es accesible a través de conexiones <strong>HTTPS</strong> seguras.</p>
+                    </div>
+                </section>
+
+                <section id="geo">
+                    <h2 class="text-3xl font-bold text-slate-900 mb-6">Geolocalización Mendoza</h2>
+                    <p class="text-slate-600 mb-6">
+                        Para evitar errores de despacho, el buscador está restringido a un <strong>Bounding Box (BBOX)</strong> que cubre únicamente el Gran Mendoza. 
+                        Esto filtra resultados irrelevantes de otras provincias.
+                    </p>
+                    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-6 mb-6">
+                        <h4 class="text-xs font-black uppercase text-slate-400 tracking-widest mb-4">Mendoza Bounds Configuration</h4>
+                        <code class="text-blue-600 font-bold">const MZA_BOUNDS = "-69.0436, -33.1092, -68.6416, -32.7483";</code>
+                    </div>
+                </section>
+
+                <section id="pricing">
+                    <h2 class="text-3xl font-bold text-slate-900 mb-6">Lógica de Precios</h2>
+                    <p class="text-slate-600 mb-6">
+                        El tarificador actual utiliza un simulador de mercado dinámico. En entornos de producción, se recomienda conectar este valor con la API de la Secretaría de Servicios Públicos o un cálculo por km/tiempo.
+                    </p>
+                    <pre><code>// Generación de tarifa estimada (ARS)
+userData.price = Math.floor(Math.random() * (3500 - 1800) + 1800);</code></pre>
+                    <div class="callout bg-amber-50 border-amber-400 text-amber-800">
+                        <div class="flex items-center gap-2 mb-2">
+                            <i data-lucide="info" class="w-5 h-5"></i>
+                            <span class="font-bold text-xs uppercase tracking-widest">Dato de Interés</span>
+                        </div>
+                        <p class="text-sm italic">El widget incluye una etiqueta de "Tarifa Garantizada" para aumentar la confianza del usuario durante el Paso 2 de cotización.</p>
+                    </div>
+                </section>
+
+                <section id="maps">
+                    <h2 class="text-3xl font-bold text-slate-900 mb-6">Integración de Mapas</h2>
+                    <p class="text-slate-600 mb-6">Utilizamos Leaflet.js con CartoDB para un rendimiento óptimo en móviles.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="p-6 bg-slate-50 rounded-2xl border border-slate-200">
+                            <h4 class="font-bold text-slate-900 mb-2">Renderizado de Ruta</h4>
+                            <p class="text-xs text-slate-500">Crea una polilínea punteada entre el origen y destino con ajuste automático de zoom (<code>fitBounds</code>).</p>
+                        </div>
+                        <div class="p-6 bg-slate-50 rounded-2xl border border-slate-200">
+                            <h4 class="font-bold text-slate-900 mb-2">Capa Visual</h4>
+                            <p class="text-xs text-slate-500">Uso de <code>light_all</code> tiles para mantener el foco en la información del viaje.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="whatsapp">
+                    <h2 class="text-3xl font-bold text-slate-900 mb-6">WhatsApp Deep Link</h2>
+                    <p class="text-slate-600 mb-8">El despacho se activa mediante un enlace profundo que envía la información estructurada directamente al WhatsApp del chofer.</p>
+                    
+                    <div class="overflow-hidden border border-slate-200 rounded-2xl mb-12">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-50 border-b border-slate-200">
+                                <tr>
+                                    <th class="px-6 py-4 font-bold text-slate-900">Variable</th>
+                                    <th class="px-6 py-4 font-bold text-slate-900">Descripción</th>
+                                    <th class="px-6 py-4 font-bold text-slate-900">Tipo</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr>
+                                    <td class="px-6 py-4 font-mono text-blue-600">userName</td>
+                                    <td class="px-6 py-4 text-slate-500">Nombre del pasajero almacenado en el widget</td>
+                                    <td class="px-6 py-4"><span class="px-2 py-1 bg-slate-100 rounded text-[10px] font-bold">STRING</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-6 py-4 font-mono text-blue-600">origin</td>
+                                    <td class="px-6 py-4 text-slate-500">Dirección geocodificada de recogida</td>
+                                    <td class="px-6 py-4"><span class="px-2 py-1 bg-slate-100 rounded text-[10px] font-bold">STRING</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="px-6 py-4 font-mono text-blue-600">price</td>
+                                    <td class="px-6 py-4 text-slate-500">Monto total de la cotización</td>
+                                    <td class="px-6 py-4"><span class="px-2 py-1 bg-slate-100 rounded text-[10px] font-bold">INT</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section id="storage">
+                    <h2 class="text-3xl font-bold text-slate-900 mb-6">Local Storage & Persistencia</h2>
+                    <p class="text-slate-600 mb-6">Para mejorar el UX, el widget recuerda el nombre del pasajero utilizando el almacenamiento local del navegador.</p>
+                    <pre><code>// Persistencia de identidad
+localStorage.setItem('taxigo_name', name);
+
+// Recuperación automática
+const savedName = localStorage.getItem('taxigo_name');</code></pre>
+                </section>
+
+                <footer class="mt-32 pt-12 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div class="flex items-center gap-2 opacity-50 grayscale">
+                        <div class="bg-black p-1 rounded">
+                            <i data-lucide="taxi" class="w-4 h-4 text-white"></i>
+                        </div>
+                        <span class="font-bold text-sm tracking-tighter uppercase italic">TaxiGO Mendoza</span>
+                    </div>
+                    <p class="text-xs text-slate-400 font-medium italic">© 2026 Powered by Mendoza Digital Identity System</p>
+                    <div class="flex gap-6 text-xs font-bold text-slate-400 uppercase tracking-widest">
+                        <a href="#" class="hover:text-black transition-colors">Privacidad</a>
+                        <a href="#" class="hover:text-black transition-colors">API Status</a>
+                    </div>
+                </footer>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Initialize Icons
+        lucide.createIcons();
+
+        // Highlighting active sidebar links on scroll
+        const sections = document.querySelectorAll('section');
+        const navLinks = document.querySelectorAll('.nav-link');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (pageYOffset >= sectionTop - 100) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('sidebar-active');
+                link.classList.add('sidebar-item');
+                if (link.getAttribute('href').includes(current)) {
+                    link.classList.add('sidebar-active');
+                    link.classList.remove('sidebar-item');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -3,51 +3,210 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TaxiChat - Pasajero</title>
+    <title>Solicitar Viaje | SaaS Taxi</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
-</head>
-<body class="bg-slate-100 p-4">
-    <div class="max-w-md mx-auto bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-white">
-        <div class="bg-yellow-400 p-6">
-            <h2 class="text-2xl font-black text-yellow-900 italic">TAXI YA</h2>
-            <p class="text-yellow-800 text-xs font-bold uppercase tracking-widest opacity-70">Mendoza Ciudad</p>
-        </div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #f1f5f9; 
+        }
+        .step-transition {
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .loader {
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        <div class="p-6 space-y-6">
-            <div class="space-y-4">
-                <input type="text" id="origen" class="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-yellow-400" placeholder="📍 ¿Dónde te buscamos?">
-                <input type="text" id="destino" oninput="document.getElementById('price').innerText = '$' + (Math.floor(Math.random()*2000)+1500)" class="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-yellow-400" placeholder="🏁 ¿A dónde vas?">
-                <input type="text" id="pasajero" class="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-yellow-400" placeholder="👤 Tu nombre">
+        /* Efecto de pulso para disponibilidad */
+        .pulse {
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+            animation: pulse-green 2s infinite;
+        }
+        @keyframes pulse-green {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div id="app-container" class="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl border border-white/20 overflow-hidden relative">
+        
+        <div id="brand-header" class="p-8 text-center text-white bg-slate-900 transition-all duration-700">
+            <div id="brand-logo" class="text-4xl mb-2">🚖</div>
+            <h1 id="brand-name" class="text-xl font-extrabold uppercase tracking-tighter">Cargando...</h1>
+            <p id="brand-tagline" class="text-[10px] opacity-60 font-bold uppercase tracking-[0.2em] mt-1">Smart Mobility SaaS</p>
+        </div>
+
+        <div class="p-8">
+            <div id="step-1" class="step-transition space-y-6">
+                <div class="space-y-4">
+                    <div class="relative">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Pasajero</label>
+                        <input type="text" id="input-name" placeholder="Tu nombre completo" 
+                            class="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-slate-900 rounded-2xl outline-none transition-all placeholder:text-slate-300">
+                    </div>
+
+                    <div class="relative">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Origen</label>
+                        <input type="text" id="input-origin" placeholder="¿Dónde te buscamos?" 
+                            class="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-slate-900 rounded-2xl outline-none transition-all placeholder:text-slate-300">
+                        <button onclick="detectLocation()" class="absolute right-4 top-10 text-slate-400 hover:text-slate-900 transition-colors">
+                            📍
+                        </button>
+                    </div>
+
+                    <div class="relative">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Destino</label>
+                        <input type="text" id="input-destination" placeholder="¿A dónde vas?" 
+                            class="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-slate-900 rounded-2xl outline-none transition-all placeholder:text-slate-300">
+                    </div>
+                </div>
+
+                <div id="price-box" class="hidden animate-in fade-in slide-in-from-top-2 bg-slate-900 text-white p-6 rounded-3xl flex justify-between items-center shadow-xl">
+                    <div>
+                        <p class="text-[10px] opacity-50 font-bold uppercase tracking-wider">Tarifa Estimada</p>
+                        <p id="display-price" class="text-3xl font-extrabold">$0.00</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-[10px] opacity-50 font-bold uppercase tracking-wider">Llegada</p>
+                        <p class="text-sm font-bold">~ 4-7 min</p>
+                    </div>
+                </div>
+
+                <button id="btn-main" onclick="processOrder()" 
+                    class="w-full py-5 bg-slate-900 text-white font-extrabold rounded-2xl shadow-xl transform active:scale-[0.97] transition-all uppercase tracking-widest text-sm">
+                    Solicitar Viaje
+                </button>
             </div>
 
-            <div class="bg-slate-900 rounded-2xl p-4 text-center">
-                <span class="text-slate-400 text-[10px] block uppercase font-bold tracking-widest mb-1">Tarifa Estimada</span>
-                <span id="price" class="text-2xl font-black text-yellow-400">$ 0.00</span>
+            <div id="step-2" class="hidden step-transition py-10 text-center space-y-6">
+                <div class="flex justify-center">
+                    <div class="loader w-16 h-16 border-4 border-slate-100 border-t-slate-900 rounded-full"></div>
+                </div>
+                <div class="space-y-2">
+                    <h3 class="text-xl font-extrabold text-slate-900 uppercase">Buscando Unidad</h3>
+                    <p class="text-sm text-slate-400 px-6">Estamos notificando a los choferes más cercanos a tu ubicación.</p>
+                </div>
+                <button onclick="goToStep(1)" class="text-xs font-bold text-red-400 uppercase tracking-widest hover:text-red-600 transition-colors">Cancelar</button>
             </div>
 
-            <button onclick="enviarViaje()" class="w-full bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-black py-4 rounded-2xl shadow-lg transition-transform active:scale-95">
-                PEDIR COCHE AHORA
-            </button>
+            <div id="step-3" class="hidden step-transition space-y-6 animate-in zoom-in duration-500">
+                <div class="flex flex-col items-center text-center space-y-4">
+                    <div class="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center pulse">
+                        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                    </div>
+                    <h3 class="text-2xl font-extrabold text-slate-900 uppercase tracking-tighter">¡Viaje en camino!</h3>
+                </div>
+
+                <div class="bg-slate-50 border border-slate-100 p-6 rounded-[2rem] space-y-4">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Chofer asignado</p>
+                            <p id="driver-name" class="text-lg font-extrabold text-slate-900">Cargando...</p>
+                        </div>
+                        <div class="bg-white px-3 py-1 rounded-full border border-slate-200 text-[10px] font-black">⭐ 4.9</div>
+                    </div>
+                    <div class="pt-4 border-t border-slate-200">
+                        <a id="mp-link" href="#" target="_blank" 
+                            class="flex items-center justify-center gap-3 w-full py-4 bg-[#009EE3] text-white font-bold rounded-2xl hover:brightness-110 transition-all shadow-lg">
+                            <span>Pagar con Mercado Pago</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        const socket = io({ path: '/api/socket', transports: ['polling'] });
-        
-        function enviarViaje() {
-            const data = {
-                origen: document.getElementById('origen').value,
-                destino: document.getElementById('destino').value,
-                pasajero: document.getElementById('pasajero').value,
-                tarifa: document.getElementById('price').innerText,
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            };
-            if(data.origen && data.destino && data.pasajero) {
-                socket.emit('nuevo-viaje', data);
-                alert("¡Solicitud enviada! Esperando conductor...");
+        // CONFIGURACIÓN SUPABASE (Reemplazar con tus credenciales de .env)
+        const SB_URL = "TU_SUPABASE_URL";
+        const SB_KEY = "TU_SUPABASE_ANON_KEY";
+        const supabase = window.supabase.createClient(SB_URL, SB_KEY);
+
+        // CONFIGURACIÓN MARCA BLANCA
+        const params = new URLSearchParams(window.location.search);
+        const slug = params.get('slug') || 'default';
+        let empresaData = null;
+
+        async function loadConfig() {
+            try {
+                const res = await fetch(`/api/config/${slug}`);
+                empresaData = await res.json();
+                
+                // Inyectar marca blanca
+                document.getElementById('brand-name').innerText = empresaData.nombre;
+                document.getElementById('brand-header').style.backgroundColor = empresaData.config.color || '#0f172a';
+                document.getElementById('btn-main').style.backgroundColor = empresaData.config.color || '#0f172a';
+                
+                // Suscribirse al canal de Realtime para esta empresa
+                const channel = supabase.channel(`admin-${slug}`)
+                    .on('broadcast', { event: 'confirmacion-cliente' }, (payload) => {
+                        handleOrderConfirmed(payload.payload);
+                    })
+                    .subscribe();
+
+            } catch (err) {
+                console.error("Config error:", err);
             }
         }
+
+        // Lógica de Precios (Simulada para el PMV)
+        document.getElementById('input-destination').addEventListener('blur', () => {
+            const dest = document.getElementById('input-destination').value;
+            if (dest) {
+                document.getElementById('price-box').classList.remove('hidden');
+                document.getElementById('display-price').innerText = `$${Math.floor(Math.random() * (2500 - 1200) + 1200)}`;
+            }
+        });
+
+        async function processOrder() {
+            const name = document.getElementById('input-name').value;
+            if(!name) return alert("Por favor, ingresa tu nombre");
+
+            goToStep(2);
+
+            // Enviar pedido al Backend
+            const pedido = {
+                usuario: name,
+                origen: document.getElementById('input-origin').value,
+                destino: document.getElementById('input-destination').value,
+                precio: document.getElementById('display-price').innerText,
+                empresaSlug: slug
+            };
+
+            await fetch('/api/nuevo-pedido', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(pedido)
+            });
+        }
+
+        function handleOrderConfirmed(data) {
+            goToStep(3);
+            document.getElementById('driver-name').innerText = data.chofer || "Asignado";
+            document.getElementById('mp-link').href = data.mpLink || "#";
+        }
+
+        function goToStep(num) {
+            [1, 2, 3].forEach(n => document.getElementById(`step-${n}`).classList.add('hidden'));
+            document.getElementById(`step-${num}`).classList.remove('hidden');
+        }
+
+        function detectLocation() {
+            document.getElementById('input-origin').value = "Detectando...";
+            setTimeout(() => {
+                document.getElementById('input-origin').value = "Mi ubicación actual (Mendoza)";
+            }, 1000);
+        }
+
+        window.onload = loadConfig;
     </script>
 </body>
 </html>

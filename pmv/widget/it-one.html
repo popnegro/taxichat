@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>TaxiChat PRO Maps</title>
+
+<style>
+body { margin:0; font-family:Arial; }
+
+#widget {
+  position:fixed;
+  bottom:20px;
+  right:20px;
+  width:340px;
+  background:#0f0f0f;
+  color:white;
+  border-radius:16px;
+  overflow:hidden;
+  box-shadow:0 10px 40px rgba(0,0,0,0.4);
+}
+
+#chat {
+  height:400px;
+  overflow-y:auto;
+  padding:15px;
+}
+
+.msg { margin:8px 0; }
+.bot { color:#ccc; }
+.user { text-align:right; }
+
+input {
+  width:100%;
+  padding:12px;
+  border:none;
+  outline:none;
+}
+</style>
+</head>
+
+<body>
+
+<div id="widget">
+  <div id="chat"></div>
+  <input id="input" placeholder="Ingresá dirección..." />
+</div>
+
+<!-- 🔥 GOOGLE MAPS -->
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAagsxmjGfN16XijYhcGNG_9yQQyCZ4NRQ&libraries=places"></script>
+
+<script>
+const chat = document.getElementById("chat");
+const input = document.getElementById("input");
+
+let state = {
+  step: 0,
+  origen: "",
+  destino: "",
+  distancia: 0,
+  duracion: "",
+  precio: 0
+};
+
+// 💬 UI
+function bot(msg){
+  chat.innerHTML += `<div class="msg bot">${msg}</div>`;
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function user(msg){
+  chat.innerHTML += `<div class="msg user">${msg}</div>`;
+  chat.scrollTop = chat.scrollHeight;
+}
+
+// 📍 AUTOCOMPLETE
+const autocomplete = new google.maps.places.Autocomplete(input);
+
+autocomplete.addListener("place_changed", () => {
+  const place = autocomplete.getPlace();
+  next(place.formatted_address);
+});
+
+// 🚀 flujo
+function next(val){
+  user(val);
+
+  if(state.step === 0){
+    state.destino = val;
+    bot("Perfecto. ¿Desde dónde salís?");
+    state.step++;
+  }
+
+  else if(state.step === 1){
+    state.origen = val;
+
+    bot("Calculando ruta...");
+
+    calcularRuta();
+    state.step++;
+  }
+}
+
+// 🧠 DISTANCIA REAL
+function calcularRuta(){
+  const service = new google.maps.DistanceMatrixService();
+
+  service.getDistanceMatrix({
+    origins: [state.origen],
+    destinations: [state.destino],
+    travelMode: "DRIVING"
+  }, (res, status) => {
+
+    if(status !== "OK"){
+      bot("Error calculando distancia 😢");
+      return;
+    }
+
+    const data = res.rows[0].elements[0];
+
+    state.distancia = data.distance.value / 1000; // km
+    state.duracion = data.duration.text;
+
+    calcularPrecio();
+  });
+}
+
+// 💰 PRECIO DINÁMICO
+function calcularPrecio(){
+  state.precio = 500 + (300 * state.distancia);
+
+  bot(`Distancia: ${state.distancia.toFixed(1)} km`);
+  bot(`Tiempo estimado: ${state.duracion}`);
+  bot(`Precio estimado: $${Math.round(state.precio)}`);
+
+  bot("Buscando conductor...");
+
+  setTimeout(()=>{
+    bot("Tenemos un conductor disponible 🚕");
+    bot(`<button onclick="goWhats()">Confirmar por WhatsApp</button>`);
+  }, 1200);
+}
+
+// 📲 WHATSAPP
+function goWhats(){
+  const msg = `Taxi desde ${state.origen} hasta ${state.destino}
+Distancia: ${state.distancia.toFixed(1)} km
+Tiempo: ${state.duracion}
+Precio: $${Math.round(state.precio)}`;
+
+  window.open(`https://wa.me/5492610000000?text=${encodeURIComponent(msg)}`);
+}
+
+// init
+bot("Hola 👋 ¿A dónde vas?");
+</script>
+
+</body>
+</html>

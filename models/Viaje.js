@@ -45,4 +45,4 @@ const ViajeSchema = new mongoose.Schema({
 // Índice para filtrar el historial por empresa rápidamente
 ViajeSchema.index({ empresaId: 1, fecha: -1 });
 
-module.exports = mongoose.model('Viaje', ViajeSchema);
+module.exports = mongoose.models.Viaje || mongoose.model('Viaje', ViajeSchema);

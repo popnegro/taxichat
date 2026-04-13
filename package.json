@@ -2,17 +2,18 @@
   "name": "taxichat",
   "version": "1.0.0",
   "description": "Sistema de gestión de taxis con Socket.io y MongoDB",
-  "main": "index.js",
+  "main": "api/index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "next dev"
+    "start": "node api/index.js",
+    "dev": "node api/index.js"
   },
   "dependencies": {
-    "mongodb": "^6.3.0",
-    "socket.io": "^4.7.4",
-    "socket.io-client": "^4.7.4",
-    "google-auth-library": "^9.6.3",
-    "dotenv": "^16.4.1"
+    "@supabase/supabase-js": "^2.103.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.1",
+    "express": "^4.18.2",
+    "mongoose": "^8.1.1",
+    "socket.io": "^4.7.4"
   },
   "engines": {
     "node": ">=18.x"

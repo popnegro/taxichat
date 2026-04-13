@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TaxiChat | Silver Edition</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        silver: {
+                            50: '#F9FAFB', 100: '#F3F4F6', 200: '#E5E7EB',
+                            300: '#D1D5DB', 400: '#9CA3AF', 500: '#6B7280',
+                            600: '#4B5563', 700: '#374151', 800: '#1F2937',
+                            900: '#111827', black: '#0A0A0A'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0f0f0; }
+        
+        /* Estética Silver para el Widget */
+        #chat-widget {
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            transform-origin: bottom right;
+        }
+        
+        .chat-closed { transform: scale(0) translateY(100px); opacity: 0; pointer-events: none; }
+        .chat-open { transform: scale(1) translateY(0); opacity: 1; }
+
+        .silver-glass {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .step-hidden { display: none !important; }
+        
+        .leaflet-container { 
+            filter: grayscale(1) contrast(1.1) brightness(1.1); 
+            border-radius: 1.5rem;
+            z-index: 1;
+        }
+
+        /* Animación del botón pulsante */
+        .btn-pulse {
+            animation: pulse-silver 2s infinite;
+        }
+        @keyframes pulse-silver {
+            0% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.2); }
+            70% { box-shadow: 0 0 0 15px rgba(0, 0, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+        }
+    </style>
+</head>
+<body>
+
+    <button onclick="toggleChat()" class="fixed bottom-6 right-6 w-16 h-16 bg-silver-black text-white rounded-2xl shadow-2xl z-[200] flex items-center justify-center btn-pulse hover:scale-110 transition-transform active:scale-90">
+        <i data-lucide="taxi" class="w-8 h-8"></i>
+    </button>
+
+    <div id="chat-widget" class="fixed bottom-24 right-6 w-[380px] max-w-[calc(100vw-3rem)] h-[600px] max-h-[calc(100vh-8rem)] silver-glass rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.2)] z-[200] flex flex-col overflow-hidden chat-closed">
+        
+        <header class="bg-silver-black p-6 text-white">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h3 class="text-xl font-[900] tracking-tighter italic uppercase">TaxiGO</h3>
+                    <div class="flex items-center gap-1.5 mt-1">
+                        <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
+                        <span class="text-[9px] font-bold uppercase tracking-widest text-silver-400">Concierge Online</span>
+                    </div>
+                </div>
+                <button onclick="toggleChat()" class="p-2 hover:bg-white/10 rounded-full transition-colors">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto p-6 space-y-6">
+            
+            <div class="flex gap-3">
+                <div class="w-8 h-8 bg-silver-100 rounded-full flex items-center justify-center shrink-0">
+                    <i data-lucide="bot" class="w-4 h-4 text-silver-900"></i>
+                </div>
+                <div class="bg-white p-4 rounded-2xl rounded-tl-none border border-silver-100 shadow-sm">
+                    <p class="text-xs font-semibold leading-relaxed text-silver-700 italic">
+                        "Bienvenido a la experiencia Silver. Indíqueme su destino para cotizar su viaje en Mendoza."
+                    </p>
+                </div>
+            </div>
+
+            <section id="step-1" class="space-y-4">
+                <div class="space-y-3">
+                    <div class="relative">
+                        <i data-lucide="user" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-silver-300"></i>
+                        <input type="text" id="userName" placeholder="Su nombre" class="w-full pl-12 pr-4 py-4 bg-white border border-silver-100 rounded-2xl text-xs font-bold focus:border-black transition-all outline-none">
+                    </div>
+                    <div class="flex gap-2">
+                        <div class="relative flex-1">
+                            <i data-lucide="map-pin" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-silver-300"></i>
+                            <input type="text" id="origin" placeholder="Origen" class="w-full pl-12 pr-4 py-4 bg-white border border-silver-100 rounded-2xl text-xs font-bold outline-none">
+                        </div>
+                        <button onclick="getLocation()" class="px-4 bg-silver-100 rounded-2xl text-silver-900"><i data-lucide="locate" class="w-4 h-4"></i></button>
+                    </div>
+                    <div class="relative">
+                        <i data-lucide="navigation" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-silver-300"></i>
+                        <input type="text" id="destination" oninput="searchMendoza(this.value)" placeholder="Destino" class="w-full pl-12 pr-4 py-4 bg-white border border-silver-100 rounded-2xl text-xs font-bold outline-none">
+                        <div id="results" class="hidden absolute bottom-full left-0 right-0 bg-white border border-silver-200 shadow-2xl rounded-2xl z-[1000] max-h-40 overflow-y-auto mb-2"></div>
+                    </div>
+                </div>
+                <button onclick="toStep2()" class="w-full bg-silver-black text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-lg active:scale-95 transition-all">Calcular Tarifa</button>
+            </section>
+
+            <section id="step-2" class="step-hidden space-y-4 fade-in">
+                <div id="mini-map" class="h-40 w-full shadow-inner"></div>
+                <div class="p-6 bg-silver-50 rounded-[2rem] border border-silver-100 text-center">
+                    <span class="text-[9px] font-black uppercase tracking-widest text-silver-400">Tarifa Silver Est.</span>
+                    <h4 id="display-price" class="text-4xl font-black italic text-silver-black mt-1">$0</h4>
+                </div>
+                <button onclick="sendToWhatsApp()" class="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-2 shadow-lg">
+                    Pedir por WhatsApp <i data-lucide="message-circle" class="w-4 h-4"></i>
+                </button>
+            </section>
+
+        </div>
+
+        <footer class="p-4 bg-white/50 border-t border-silver-100 text-center">
+            <p class="text-[8px] font-black uppercase tracking-widest text-silver-300 italic">Mendoza · Silver Fleet Service</p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.372.0/dist/umd/lucide.min.js"></script>
+
+    <script>
+        const CONFIG = {
+            rates: { flag: 1200, km: 650 },
+            agency: { phone: "5492610000000", bounds: "-68.9000,-33.0500,-68.7500,-32.8000" }
+        };
+
+        let map, routeLayer, orderData = { start: null, end: null, price: 0 };
+
+        function toggleChat() {
+            const w = document.getElementById('chat-widget');
+            w.classList.toggle('chat-closed');
+            w.classList.toggle('chat-open');
+            if(!map && w.classList.contains('chat-open')) {
+                // Pequeño delay para que el mapa renderice bien con la animación
+                setTimeout(initMiniMap, 400);
+            }
+        }
+
+        function initMiniMap() {
+            if(map) return;
+            map = L.map('mini-map', { zoomControl: false, attributionControl: false }).setView([-32.8895, -68.8458], 13);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+        }
+
+        window.getLocation = function() {
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                orderData.start = [pos.coords.latitude, pos.coords.longitude];
+                document.getElementById('origin').value = "Mi ubicación";
+            });
+        };
+
+        async function searchMendoza(q) {
+            const resEl = document.getElementById('results');
+            if (q.length < 3) return resEl.classList.add('hidden');
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q + ", Mendoza")}&viewbox=${CONFIG.agency.bounds}&bounded=1&limit=4`);
+            const data = await res.json();
+            resEl.innerHTML = data.map(i => `<div class="p-4 hover:bg-silver-50 cursor-pointer border-b text-[10px] font-bold uppercase" onclick="setDest('${i.display_name.split(',')[0]}', ${i.lat}, ${i.lon})">${i.display_name.split(',')[0]}</div>`).join('');
+            resEl.classList.remove('hidden');
+        }
+
+        function setDest(n, lat, lon) {
+            document.getElementById('destination').value = n;
+            orderData.end = [parseFloat(lat), parseFloat(lon)];
+            document.getElementById('results').classList.add('hidden');
+        }
+
+        async function toStep2() {
+            if (!orderData.end || !orderData.start) return alert("Complete los datos");
+            
+            const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${orderData.start[1]},${orderData.start[0]};${orderData.end[1]},${orderData.end[0]}?overview=full&geometries=geojson`);
+            const data = await res.json();
+            
+            if (data.routes[0]) {
+                if (routeLayer) map.removeLayer(routeLayer);
+                routeLayer = L.geoJSON(data.routes[0].geometry, { style: { color: '#000', weight: 4 } }).addTo(map);
+                orderData.price = Math.round(CONFIG.rates.flag + ((data.routes[0].distance / 1000) * CONFIG.rates.km));
+                document.getElementById('display-price').innerText = `$${orderData.price}`;
+                map.fitBounds(routeLayer.getBounds(), { padding: [20, 20] });
+            }
+            
+            document.getElementById('step-1').classList.add('step-hidden');
+            document.getElementById('step-2').classList.remove('step-hidden');
+            lucide.createIcons();
+        }
+
+        function sendToWhatsApp() {
+            const msg = `*TAXI CHAT SILVER*\n👤 ${document.getElementById('userName').value}\n📍 Origen: ${document.getElementById('origin').value}\n🏁 Destino: ${document.getElementById('destination').value}\n💰 Tarifa: $${orderData.price}`;
+            window.open(`https://wa.me/${CONFIG.agency.phone}?text=${encodeURIComponent(msg)}`, '_blank');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taxi Widget - Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style type="text/tailwindcss">
+        /* Configuración de marca dinámica */
+        :root {
+            --brand-primary: #FFD600; /* Amarillo Mendoza por defecto */
+            --brand-dark: #0f172a;
+        }
+        @layer base {
+            body { @apply bg-slate-50 antialiased text-slate-900; }
+        }
+        .btn-primary {
+            background-color: var(--brand-primary);
+            @apply text-black font-black uppercase tracking-tighter py-4 px-6 rounded-xl transition-all active:scale-95 shadow-lg shadow-yellow-500/20;
+        }
+        .input-field {
+            @apply w-full p-4 bg-white border-2 border-slate-100 rounded-xl text-lg outline-none focus:border-[var(--brand-primary)] transition-colors placeholder:text-slate-400;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-md bg-white rounded-3xl shadow-2xl shadow-slate-200/50 p-6 border border-slate-100">
+        
+        <header class="mb-8 text-center">
+            <h2 class="text-2xl font-black uppercase tracking-tight italic">Taxi<span class="text-slate-400 font-light">Go</span></h2>
+            <p class="text-slate-500 text-sm font-medium">Despacho inmediato en Mendoza</p>
+        </header>
+
+        <div id="ui" class="space-y-4">
+            <div class="relative group">
+                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-xl">🎯</span>
+                <input type="text" id="origin" placeholder="¿Dónde te buscamos?" class="input-field pl-12">
+            </div>
+
+            <div class="relative group">
+                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-xl">🏁</span>
+                <input type="text" id="destination" placeholder="¿A dónde vas?" class="input-field pl-12">
+            </div>
+
+            <div class="pt-2">
+                <label class="text-[10px] uppercase font-bold text-slate-400 ml-1 mb-1 block tracking-widest">Datos del Pasajero</label>
+                <input type="text" id="passenger_name" placeholder="Escribe tu nombre" class="input-field border-dashed">
+            </div>
+
+            <button onclick="enviar()" class="btn-primary w-full mt-4">
+                Confirmar Pedido
+            </button>
+        </div>
+
+        <div id="status" class="hidden text-center p-8 animate-pulse">
+            <div class="inline-block p-4 rounded-full bg-yellow-100 mb-4 text-3xl">🚖</div>
+            <p class="font-bold text-slate-800 text-lg" id="status-text">Buscando móvil...</p>
+            <p class="text-sm text-slate-400 mt-2">No cierres esta ventana</p>
+        </div>
+    </div>
+
+    <script>
+        // Cargar Maps dinámicamente desde el backend de Vercel
+        async function init() {
+            try {
+                const res = await fetch('/api/config');
+                const { mapsKey } = await res.json();
+                
+                const script = document.createElement('script');
+                script.src = `https://maps.googleapis.com/maps/api/js?key=${mapsKey}&libraries=places`;
+                script.onload = () => {
+                    const opts = { componentRestrictions: { country: "ar" } };
+                    new google.maps.places.Autocomplete(document.getElementById('origin'), opts);
+                    new google.maps.places.Autocomplete(document.getElementById('destination'), opts);
+                };
+                document.head.appendChild(script);
+            } catch (err) {
+                console.error("Error cargando configuración:", err);
+            }
+        }
+
+        function enviar() {
+            const passenger = document.getElementById('passenger_name').value;
+            if (!passenger) return alert("Por favor, ingresa tu nombre");
+
+            const payload = {
+                id: Date.now(),
+                passenger: passenger,
+                origin: document.getElementById('origin').value,
+                dest: document.getElementById('destination').value
+            };
+
+            window.parent.postMessage({ type: "NEW_ORDER", payload }, "*");
+            
+            // Animación de salida UI
+            document.getElementById('ui').classList.add('hidden');
+            const statusDiv = document.getElementById('status');
+            statusDiv.classList.remove('hidden');
+            statusDiv.classList.add('flex', 'flex-col', 'items-center');
+        }
+
+        window.addEventListener("message", (e) => {
+            if (e.data.type === "DISPATCH_CONFIRM") {
+                const statusText = document.getElementById('status-text');
+                statusText.innerHTML = `<span class="text-green-600 italic">¡Confirmado!</span><br>${e.data.message}`;
+                document.getElementById('status').classList.remove('animate-pulse');
+            }
+        });
+
+        init();
+    </script>
+</body>
+</html>

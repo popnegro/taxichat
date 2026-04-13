@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaxiGO | Mendoza Enterprise</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.372.0/dist/umd/lucide.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'uber-black': '#000000',
+                        'uber-blue': '#276EF1',
+                        'uber-gray-50': '#F6F6F6',
+                        'uber-gray-100': '#EEEEEE',
+                        'uber-green': '#05A357'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #F6F6F6; color: #000000; }
+        .uber-card { background: #FFFFFF; border: 1px solid #EEEEEE; border-radius: 0; }
+        .uber-input { border: 2px solid #EEEEEE; border-radius: 0; background: #F6F6F6; outline: none; }
+        .uber-input:focus { border-color: #000000; background: #FFFFFF; }
+        .uber-btn-primary { background: #000000; color: #FFFFFF; font-weight: 700; text-transform: uppercase; border-radius: 0; }
+        #map { height: 280px; width: 100%; z-index: 10; }
+        .suggestions-box { position: absolute; left: 0; right: 0; top: 100%; background: white; border: 1px solid #000; z-index: 5000; }
+        .view-hidden { display: none !important; }
+        .eta-btn { border: 1px solid #EEE; padding: 10px; font-size: 10px; font-weight: 800; }
+        .eta-btn.active { background: #000; color: #FFF; border-color: #000; }
+        .loader { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="antialiased">
+
+    <audio id="alert-sound" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3" preload="auto"></audio>
+
+
+    <main id="view-widget" class="max-w-xl mx-auto">
+        <div class="uber-card p-10 shadow-lg">
+            <div class="flex gap-1 mb-10">
+                <div id="bar-1" class="h-1 flex-1 bg-uber-black"></div>
+                <div id="bar-2" class="h-1 flex-1 bg-uber-gray-100 transition-all duration-500"></div>
+                <div id="bar-3" class="h-1 flex-1 bg-uber-gray-100 transition-all duration-500"></div>
+            </div>
+
+            <section id="step-1" class="space-y-6">
+                <h2 class="text-3xl font-black tracking-tighter italic uppercase">Pedir Viaje</h2>
+                <div class="space-y-4">
+                    <input type="text" id="custName" placeholder="Tu nombre" class="uber-input w-full p-4">
+                    <div class="relative">
+                        <input type="text" id="custOrigin" oninput="searchLoc(this.value, 'origin')" placeholder="¿Dónde estás?" class="uber-input w-full p-4 pr-12">
+                        <button onclick="detectLocation()" class="absolute right-4 top-1/2 -translate-y-1/2 text-uber-blue"><i data-lucide="map-pin" class="w-5 h-5"></i></button>
+                        <div id="origin-suggestions" class="suggestions-box view-hidden"></div>
+                    </div>
+                    <div class="relative">
+                        <input type="text" id="custDest" oninput="searchLoc(this.value, 'dest')" placeholder="¿A dónde vas?" class="uber-input w-full p-4">
+                        <div id="dest-suggestions" class="suggestions-box view-hidden"></div>
+                    </div>
+                </div>
+                <button onclick="calculateRoute()" class="uber-btn-primary w-full p-5 mt-4">Calcular Tarifa</button>
+            </section>
+
+            <section id="step-2" class="view-hidden space-y-6">
+                <div id="map"></div>
+                <div class="py-4 border-b">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase">Tarifa</p>
+                    <h2 id="display-price" class="text-4xl font-black">$0</h2>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-[10px] font-bold uppercase text-gray-500 italic">WhatsApp (261...)</label>
+                    <input type="tel" id="custPhone" oninput="validatePhone(this.value)" placeholder="261XXXXXXX" class="uber-input w-full p-4 text-xl font-bold">
+                </div>
+                <div class="flex gap-4">
+                    <button onclick="goBackToStep1()" class="bg-gray-100 flex-1 p-5 font-bold uppercase text-[10px]">Atrás</button>
+                    <button id="btn-confirm" onclick="confirmOrder()" class="uber-btn-primary flex-[2] p-5 text-xs flex items-center justify-center gap-3">
+                        <span id="text-confirm">Confirmar Pedido</span>
+                        <i id="loader-confirm" data-lucide="loader-2" class="w-4 h-4 loader hidden"></i>
+                    </button>
+                </div>
+            </section>
+
+            <section id="step-3" class="view-hidden py-10 text-center">
+                <div id="searching-ui">
+                    <div class="w-16 h-16 bg-uber-black text-white rounded-full flex items-center justify-center mx-auto mb-6">
+                        <i data-lucide="check" class="w-8 h-8"></i>
+                    </div>
+                    <h2 class="text-2xl font-black uppercase">Pedido Recibido</h2>
+                    <p class="text-[10px] text-gray-400 font-bold uppercase mt-2">Buscando móvil...</p>
+                </div>
+
+                <div id="tracking-card" class="view-hidden border-2 border-uber-black p-6 my-8 text-left bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+                    <p class="text-[10px] font-bold uppercase text-uber-blue tracking-widest italic mb-2">Unidad Asignada</p>
+                    <div class="flex justify-between items-end">
+                        <h3 id="track-movil" class="text-5xl font-black italic uppercase tracking-tighter">--</h3>
+                        <div class="text-right">
+                            <p class="text-[10px] font-bold text-gray-400 uppercase">Llega en</p>
+                            <p class="text-2xl font-black"><span id="track-eta">--</span> MIN</p>
+                        </div>
+                    </div>
+                </div>
+                <button onclick="nuevoPedido()" class="bg-gray-100 w-full p-4 text-[10px] font-bold uppercase tracking-widest">Finalizar / Nuevo</button>
+            </section>
+        </div>
+    </main>
+
+    <main id="view-admin" class="view-hidden p-8 max-w-7xl mx-auto">
+        <div class="flex justify-between items-end mb-12">
+            <h1 class="text-5xl font-black tracking-tighter uppercase italic">Consola</h1>
+            <div class="text-right">
+                <p class="text-[10px] font-bold text-gray-500 uppercase">Recaudación</p>
+                <h3 id="total-cash" class="text-3xl font-black text-uber-blue">$0</h3>
+            </div>
+        </div>
+
+        <div class="uber-card">
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="bg-uber-gray-50 border-b-2 border-uber-black text-[10px] font-bold uppercase tracking-widest">
+                        <th class="px-8 py-5">Pasajero</th>
+                        <th class="px-8 py-5">Estado / Control</th>
+                        <th class="px-8 py-5">Ruta</th>
+                        <th class="px-8 py-5 text-right">Monto</th>
+                        <th class="px-8 py-5 text-center">WA</th>
+                    </tr>
+                </thead>
+                <tbody id="orders-list" class="divide-y divide-gray-100"></tbody>
+            </table>
+        </div>
+    </main>
+
+    
+
+    <script>
+        const $ = (id) => document.getElementById(id);
+        const toggleView = (id, show) => $(id).classList[show ? 'remove' : 'add']('view-hidden');
+        const MENDOZA_BBOX = "-68.95,-33.05,-68.75,-32.80";
+
+        const SB_URL = 'https://xynkbghmcioavfmvfwkm.supabase.co';
+        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5bmtiZ2htY2lvYXZmbXZmd2ttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3MjY5OTIsImV4cCI6MjA5MTMwMjk5Mn0.HQb8_GfKpxzniW_JNp1ZXI9KvwhlSa17Lq2IfkVrVQs';
+        const taxiSupabase = supabase.createClient(SB_URL, SB_KEY);
+
+        let state = { currentPrice: 0, coords: { origin: null, dest: null } };
+        let leafMap, myOrderId = null, isRealtimeActive = false, searchTimeout;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            recoverSession();
+            checkConnection();
+        });
+
+        async function checkConnection() {
+            const { error } = await taxiSupabase.from('pedidos').select('id').limit(1);
+            if (!error) {
+                $('connection-badge').querySelector('div').className = "w-2 h-2 rounded-full bg-uber-green";
+                $('connection-badge').querySelector('span').innerText = 'Online';
+            }
+        }
+
+        // --- LÓGICA CLIENTE ---
+        function recoverSession() {
+            const savedId = localStorage.getItem('taxi_order_id');
+            if (savedId) {
+                myOrderId = savedId;
+                toggleView('step-1', false);
+                toggleView('step-3', true);
+                startTracking(myOrderId);
+                loadOrderData(myOrderId);
+            }
+        }
+
+        async function loadOrderData(id) {
+            const { data } = await taxiSupabase.from('pedidos').select('*').eq('id', id).single();
+            if (data && data.estado === 'active') {
+                $('track-movil').innerText = `UNIDAD ${data.movil_id}`;
+                $('track-eta').innerText = data.eta_minutos;
+                toggleView('tracking-card', true);
+            }
+        }
+
+        async function detectLocation() {
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const { latitude, longitude } = pos.coords;
+                state.coords.origin = [latitude, longitude];
+                const res = await fetch(`https://photon.komoot.io/reverse?lon=${longitude}&lat=${latitude}`);
+                const data = await res.json();
+                if (data.features.length > 0) {
+                    const p = data.features[0].properties;
+                    $('custOrigin').value = `${p.name || p.street || 'Mi ubicación'}, ${p.city || 'Mendoza'}`;
+                }
+            });
+        }
+
+        async function searchLoc(query, type) {
+            clearTimeout(searchTimeout);
+            const box = $(type === 'origin' ? 'origin-suggestions' : 'dest-suggestions');
+            if (query.length < 3) return box.classList.add('view-hidden');
+            searchTimeout = setTimeout(async () => {
+                const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&bbox=${MENDOZA_BBOX}&limit=4`);
+                const data = await res.json();
+                box.innerHTML = '';
+                data.features.forEach(f => {
+                    const addr = `${f.properties.name || f.properties.street || ''}, ${f.properties.city || 'Mendoza'}`;
+                    const div = document.createElement('div');
+                    div.className = 'suggestion-item'; div.innerText = addr;
+                    div.onclick = () => {
+                        $(type === 'origin' ? 'custOrigin' : 'custDest').value = addr;
+                        state.coords[type] = [f.geometry.coordinates[1], f.geometry.coordinates[0]];
+                        box.classList.add('view-hidden');
+                    };
+                    box.appendChild(div);
+                });
+                box.classList.remove('view-hidden');
+            }, 400);
+        }
+
+        function calculateRoute() {
+            if (!state.coords.origin || !state.coords.dest) return alert("Selecciona direcciones de la lista");
+            state.currentPrice = Math.max(1200, Math.round(1100 + Math.random() * 2000));
+            $('display-price').innerText = `$${state.currentPrice.toLocaleString('es-AR')}`;
+            toggleView('step-1', false);
+            toggleView('step-2', true);
+            $('bar-2').classList.replace('bg-uber-gray-100', 'bg-uber-black');
+            setTimeout(() => {
+                if (leafMap) leafMap.remove();
+                leafMap = L.map('map', { zoomControl: false, attributionControl: false }).setView(state.coords.origin, 14);
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(leafMap);
+                L.polyline([state.coords.origin, state.coords.dest], { color: '#000', weight: 5 }).addTo(leafMap);
+                leafMap.invalidateSize();
+            }, 300);
+        }
+
+        async function confirmOrder() {
+            const phone = $('custPhone').value.replace(/\D/g, '');
+            if (phone.length < 10) return alert("Ingresa 10 dígitos");
+            $('btn-confirm').disabled = true;
+            $('loader-confirm').classList.remove('hidden');
+            const payload = {
+                nombre: $('custName').value || 'Pasajero',
+                telefono: "549" + phone,
+                origen: $('custOrigin').value,
+                destino: $('custDest').value,
+                precio: state.currentPrice,
+                estado: 'pending'
+            };
+            const { data, error } = await taxiSupabase.from('pedidos').insert([payload]).select();
+            if (!error) {
+                myOrderId = data[0].id;
+                localStorage.setItem('taxi_order_id', myOrderId);
+                toggleView('step-2', false);
+                toggleView('step-3', true);
+                $('bar-3').classList.replace('bg-uber-gray-100', 'bg-uber-black');
+                startTracking(myOrderId);
+            }
+        }
+
+        function startTracking(id) {
+            taxiSupabase.channel(`track-${id}`)
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${id}` }, payload => {
+                    const p = payload.new;
+                    if (p.estado === 'active') {
+                        $('track-movil').innerText = `UNIDAD ${p.movil_id}`;
+                        $('track-eta').innerText = p.eta_minutos;
+                        toggleView('tracking-card', true);
+                        if(window.navigator.vibrate) window.navigator.vibrate(200);
+                    }
+                }).subscribe();
+        }
+
+        // --- LÓGICA OPERADOR ---
+        function switchView(v) {
+            toggleView('view-widget', v === 'widget');
+            toggleView('view-admin', v === 'admin');
+            if (v === 'admin') initAdminEngine();
+        }
+
+        async function initAdminEngine() {
+            if (isRealtimeActive) return;
+            fetchOrders();
+            taxiSupabase.channel('admin').on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
+                $('alert-sound').play(); fetchOrders();
+            }).subscribe();
+            isRealtimeActive = true;
+        }
+
+        async function fetchOrders() {
+            const { data } = await taxiSupabase.from('pedidos').select('*').neq('estado', 'done').order('created_at', { ascending: false });
+            // Sumamos lo recaudado (estado 'done' por separado)
+            const { data: doneData } = await taxiSupabase.from('pedidos').select('precio').eq('estado', 'done');
+            let cash = doneData ? doneData.reduce((acc, curr) => acc + curr.precio, 0) : 0;
+            if (data) renderTable(data, cash);
+        }
+
+        function renderTable(ps, cash) {
+            const list = $('orders-list');
+            list.innerHTML = '';
+            ps.forEach(o => {
+                const btn = o.estado === 'pending' 
+                    ? `<button onclick="openDispatch(${o.id}, '${o.telefono}', '${o.nombre}')" class="bg-amber-400 text-[10px] font-black px-4 py-2">ASIGNAR</button>`
+                    : `<button onclick="finalizarViaje(${o.id})" class="bg-uber-green text-white text-[10px] font-black px-4 py-2">FINALIZAR 🏁</button>`;
+                
+                list.innerHTML += `
+                    <tr>
+                        <td class="px-8 py-5 text-xs font-bold uppercase">${o.nombre}</td>
+                        <td class="px-8 py-5">${btn} ${o.movil_id ? '<span class="ml-2 font-black text-xs">#'+o.movil_id+'</span>' : ''}</td>
+                        <td class="px-8 py-5 text-[9px] text-gray-400 uppercase leading-tight">${o.origen.split(',')[0]}<br>→ ${o.destino.split(',')[0]}</td>
+                        <td class="px-8 py-5 text-right font-black">$${o.precio}</td>
+                        <td class="px-8 py-5 text-center"><button onclick="window.open('https://wa.me/${o.telefono}')" class="text-uber-blue"><i data-lucide="message-circle" class="w-4 h-4 mx-auto"></i></button></td>
+                    </tr>`;
+            });
+            $('total-cash').innerText = `$${cash.toLocaleString('es-AR')}`;
+            lucide.createIcons();
+        }
+
+        function openDispatch(id, phone, name) {
+            $('dispatch-order-id').value = id;
+            $('dispatch-cust-phone').value = phone;
+            $('dispatch-cust-name').value = name;
+            toggleView('dispatch-modal', true);
+            setTimeout(() => $('dispatch-movil').focus(), 100);
+        }
+
+        function setETA(val, btn) {
+            $('dispatch-eta').value = val;
+            document.querySelectorAll('.eta-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+
+        async function processDispatch() {
+            const id = $('dispatch-order-id').value;
+            const mov = $('dispatch-movil').value;
+            const eta = $('dispatch-eta').value;
+            const phone = $('dispatch-cust-phone').value;
+            const name = $('dispatch-cust-name').value;
+
+            if (!mov) return alert("Indica móvil");
+            const { error } = await taxiSupabase.from('pedidos').update({ estado: 'active', movil_id: mov, eta_minutos: parseInt(eta) }).eq('id', id);
+            if (!error) {
+                toggleView('dispatch-modal', false);
+                const msg = `TaxiGO: Hola ${name}, unidad ${mov} en camino. Llega en ${eta} min. 🚖`;
+                window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+                fetchOrders();
+            }
+        }
+
+        async function finalizarViaje(id) {
+            if(confirm("¿Marcar viaje como finalizado?")) {
+                await taxiSupabase.from('pedidos').update({ estado: 'done' }).eq('id', id);
+                fetchOrders();
+            }
+        }
+
+        function nuevoPedido() {
+            localStorage.removeItem('taxi_order_id');
+            location.reload();
+        }
+
+        function validatePhone(p) {
+            $('custPhone').value = p.replace(/\D/g, '').substring(0, 10);
+        }
+
+        function goBackToStep1() {
+            toggleView('step-2', false);
+            toggleView('step-1', true);
+            $('bar-2').classList.replace('bg-uber-black', 'bg-uber-gray-100');
+        }
+    </script>
+</body>
+</html>

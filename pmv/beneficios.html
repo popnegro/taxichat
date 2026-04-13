@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Centro de Documentación & Negocios | TaxiGO Mendoza</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=JetBrains+Mono&display=swap');
+        
+        :root { scroll-behavior: smooth; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; color: #1e293b; line-height: 1.6; }
+
+        code { 
+            font-family: 'JetBrains Mono', monospace; 
+            font-size: 0.85em; 
+            background: #f1f5f9;
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.25rem;
+            color: #0f172a;
+        }
+        
+        .sidebar-item:hover { background-color: #f1f5f9; color: #0284c7; }
+        .sidebar-active { background-color: #f0f9ff; color: #0284c7; border-right: 4px solid #0284c7; }
+        
+        .prose pre {
+            background: #0f172a; color: #e2e8f0; padding: 1.5rem;
+            border-radius: 0.75rem; overflow-x: auto; margin: 1.5rem 0;
+            border: 1px solid #1e293b;
+        }
+
+        .callout { border-left-width: 4px; padding: 1.25rem 1.5rem; margin: 2rem 0; border-radius: 0.75rem; }
+        section { padding-top: 6rem; margin-top: -3rem; }
+
+        .business-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .business-card:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1); }
+        
+        .timeline-step::before {
+            content: '';
+            position: absolute;
+            left: 19px;
+            top: 40px;
+            bottom: -20px;
+            width: 2px;
+            background: #e2e8f0;
+        }
+        .timeline-step:last-child::before { display: none; }
+    </style>
+</head>
+<body class="bg-white">
+
+    <nav class="fixed top-0 z-50 w-full bg-white/90 backdrop-blur-md border-b border-slate-200">
+        <div class="px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div class="bg-yellow-400 p-1.5 rounded-lg shadow-sm">
+                    <i data-lucide="taxi" class="w-5 h-5 text-black"></i>
+                </div>
+                <span class="font-extrabold text-xl tracking-tighter uppercase italic text-slate-900">
+                    TaxiGO <span class="text-slate-400 font-normal italic">Mendoza</span>
+                </span>
+            </div>
+            <div class="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600">
+                <a href="#quickstart" class="hover:text-black transition-colors">Docs</a>
+                <a href="#ux-roadmap" class="hover:text-black transition-colors">Experiencia</a>
+                <a href="#business-case" class="hover:text-black transition-colors">Negocios</a>
+                <a href="#costs" class="bg-black text-white px-5 py-2.5 rounded-full text-xs hover:bg-slate-800 transition-all shadow-lg">Ver Planes</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="flex">
+        <aside class="w-72 fixed top-16 bottom-0 bg-slate-50 border-r border-slate-200 overflow-y-auto hidden lg:block">
+            <div class="p-8 space-y-10">
+                <div>
+                    <h5 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-5">Especificaciones</h5>
+                    <ul class="space-y-1 text-sm font-semibold">
+                        <li><a href="#welcome" class="nav-link block p-2 rounded-lg sidebar-active">Introducción</a></li>
+                        <li><a href="#quickstart" class="nav-link block p-2 rounded-lg sidebar-item">Quick Start</a></li>
+                        <li><a href="#geo" class="nav-link block p-2 rounded-lg sidebar-item">Geofencing</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h5 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-5">Flujos de Trabajo</h5>
+                    <ul class="space-y-1 text-sm font-semibold text-slate-600">
+                        <li><a href="#ux-roadmap" class="nav-link block p-2 rounded-lg sidebar-item">Roadmap Usuario</a></li>
+                        <li><a href="#driver-roadmap" class="nav-link block p-2 rounded-lg sidebar-item">Roadmap Operador</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h5 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-5">Estrategia Comercial</h5>
+                    <ul class="space-y-1 text-sm font-semibold text-slate-600">
+                        <li><a href="#business-case" class="nav-link block p-2 rounded-lg sidebar-item">Modelo de Negocio</a></li>
+                        <li><a href="#costs" class="nav-link block p-2 rounded-lg sidebar-item text-blue-600">Costos & Soporte</a></li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
+
+        <main class="flex-1 lg:ml-72 p-8 lg:p-20">
+            <div class="max-w-4xl mx-auto">
+                
+                <section id="welcome">
+                    <div class="inline-flex items-center gap-2 bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-6">
+                        <span class="relative flex h-2 w-2">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
+                        </span>
+                        Infraestructura 2026
+                    </div>
+                    <h1 class="text-5xl font-extrabold tracking-tight text-slate-900 mb-6 leading-[1.1]">Portal TaxiGO Pro</h1>
+                    <p class="text-xl text-slate-500 leading-relaxed mb-10">
+                        Documentación integral para la digitalización de flotas en Mendoza. Diseñado para maximizar la conversión de pasajeros y optimizar la logística del operador.
+                    </p>
+                </section>
+
+                <hr class="border-slate-100 my-12">
+
+                <section id="quickstart">
+                    <h2 class="text-3xl font-bold text-slate-900 mb-6 flex items-center gap-3">
+                        <i data-lucide="terminal" class="text-slate-400"></i> Core Técnico
+                    </h2>
+                    <p class="text-slate-600 mb-6">El widget se integra como una capa ligera sobre cualquier arquitectura web preexistente:</p>
+                    <pre><code>&lt;!-- TaxiGO Pro Core --&gt;
+&lt;script src="https://cdn.tailwindcss.com"&gt;&lt;/script&gt;
+&lt;script src="https://unpkg.com/lucide@latest"&gt;&lt;/script&gt;
+&lt;link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /&gt;</code></pre>
+                </section>
+
+                <section id="geo">
+                    <h2 class="text-3xl font-bold text-slate-900 mb-6 flex items-center gap-3">
+                        <i data-lucide="map-pin" class="text-blue-500"></i> Jurisdicción Geográfica
+                    </h2>
+                    <p class="text-slate-600 mb-6">Protección contra falsos positivos fuera del área metropolitana de Mendoza (BBOX):</p>
+                    <div class="bg-slate-900 rounded-2xl p-6 text-yellow-400 font-mono text-sm border-l-8 border-yellow-400">
+                        const MZA_BOUNDS = "-69.0436, -33.1092, -68.6416, -32.7483";
+                    </div>
+                </section>
+
+                <hr class="border-slate-100 my-24">
+
+                <section id="ux-roadmap">
+                    <div class="mb-10">
+                        <span class="text-yellow-600 font-bold text-xs uppercase tracking-widest block mb-2">Customer Experience</span>
+                        <h2 class="text-4xl font-extrabold text-slate-900 tracking-tight">Ruta del Pasajero</h2>
+                        <p class="text-slate-500 mt-2">Optimizado para completar un pedido en menos de 45 segundos.</p>
+                    </div>
+
+                    <div class="space-y-0">
+                        <div class="relative pl-12 pb-12 timeline-step">
+                            <div class="absolute left-0 top-0 w-10 h-10 bg-black text-white rounded-xl flex items-center justify-center shadow-lg z-10">
+                                <i data-lucide="smartphone" class="w-5 h-5 text-yellow-400"></i>
+                            </div>
+                            <h4 class="font-extrabold text-slate-900 text-lg">1. Acceso sin Fricción</h4>
+                            <p class="text-slate-500 text-sm mt-1 leading-relaxed">El usuario escanea un QR o accede vía URL. No requiere descarga de App ni registro de cuenta, lo que aumenta la conversión inicial en un 70%.</p>
+                        </div>
+                        <div class="relative pl-12 pb-12 timeline-step">
+                            <div class="absolute left-0 top-0 w-10 h-10 bg-slate-100 text-black rounded-xl flex items-center justify-center z-10">
+                                <i data-lucide="navigation" class="w-5 h-5"></i>
+                            </div>
+                            <h4 class="font-extrabold text-slate-900 text-lg">2. Geolocalización Automática</h4>
+                            <p class="text-slate-500 text-sm mt-1">El sistema detecta su posición GPS actual en Mendoza. El usuario solo debe ingresar o confirmar el destino mediante sugerencias inteligentes.</p>
+                        </div>
+                        <div class="relative pl-12 pb-12 timeline-step">
+                            <div class="absolute left-0 top-0 w-10 h-10 bg-slate-100 text-black rounded-xl flex items-center justify-center z-10">
+                                <i data-lucide="banknote" class="w-5 h-5"></i>
+                            </div>
+                            <h4 class="font-extrabold text-slate-900 text-lg">3. Cotización Transparente</h4>
+                            <p class="text-slate-500 text-sm mt-1">Se visualiza el costo estimado y la ruta en el mapa. Esto elimina la incertidumbre del pasajero y genera confianza inmediata.</p>
+                        </div>
+                        <div class="relative pl-12 timeline-step">
+                            <div class="absolute left-0 top-0 w-10 h-10 bg-yellow-400 text-black rounded-xl flex items-center justify-center shadow-lg z-10">
+                                <i data-lucide="check-circle" class="w-5 h-5"></i>
+                            </div>
+                            <h4 class="font-extrabold text-slate-900 text-lg">4. Confirmación vía WhatsApp</h4>
+                            <p class="text-slate-500 text-sm mt-1 italic">Un solo botón dispara el mensaje estructurado al chofer, cerrando el ciclo de venta sin intermediarios costosos.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <hr class="border-slate-100 my-24">
+
+                <section id="driver-roadmap">
+                    <div class="mb-10 text-right">
+                        <span class="text-blue-600 font-bold text-xs uppercase tracking-widest block mb-2">Operational Efficiency</span>
+                        <h2 class="text-4xl font-extrabold text-slate-900 tracking-tight">Protocolo del Operador / Chofer</h2>
+                        <p class="text-slate-500 mt-2">Flujo logístico diseñado para reducir el tiempo de respuesta y errores de calle.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-12">
+                        <div class="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-200">
+                            <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-6">
+                                <i data-lucide="message-square" class="text-blue-600 w-6 h-6"></i>
+                            </div>
+                            <h4 class="font-bold text-slate-900 text-lg mb-2">Recepción de Datos</h4>
+                            <p class="text-slate-500 text-sm leading-relaxed">El operador recibe un mensaje estructurado con: Nombre, Origen exacto con Link de Maps, Destino y Precio pactado. No hay margen de error por mala comunicación auditiva.</p>
+                        </div>
+                        <div class="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-200">
+                            <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-6">
+                                <i data-lucide="truck" class="text-blue-600 w-6 h-6"></i>
+                            </div>
+                            <h4 class="font-bold text-slate-900 text-lg mb-2">Asignación Ágil</h4>
+                            <p class="text-slate-500 text-sm leading-relaxed">El operador central reenvía el bloque de datos al chofer más cercano. El chofer simplemente toca el link de Google Maps para iniciar la navegación hasta el pasajero.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <hr class="border-slate-100 my-24">
+
+                <section id="business-case">
+                    <span class="text-blue-600 font-bold text-xs uppercase tracking-widest">Business Intelligence</span>
+                    <h2 class="text-4xl font-extrabold text-slate-900 mt-4 mb-8">Plan de Costos y Beneficios</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
+                        <div class="business-card p-10 bg-slate-50 border border-slate-200 rounded-[3rem] space-y-4">
+                            <i data-lucide="trending-down" class="text-green-600 w-10 h-10"></i>
+                            <h3 class="text-2xl font-bold text-slate-900 tracking-tighter">0% Comisiones</h3>
+                            <p class="text-sm text-slate-500 leading-relaxed italic">Elimina el 25% de comisión que cobran plataformas como Uber o Cabify. El valor íntegro del viaje queda en la recaudación de la flota.</p>
+                        </div>
+                        <div class="business-card p-10 bg-slate-900 text-white rounded-[3rem] space-y-4">
+                            <i data-lucide="database" class="text-yellow-400 w-10 h-10"></i>
+                            <h3 class="text-2xl font-bold tracking-tighter">Dueño de los Datos</h3>
+                            <p class="text-sm text-slate-400 leading-relaxed">A diferencia de otras Apps, tú eres dueño de la base de datos de tus pasajeros en Mendoza para futuras campañas de marketing.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="costs">
+                    <h3 class="text-3xl font-extrabold text-slate-900 mb-8">Estructura de Inversión</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="p-8 border-2 border-slate-100 rounded-3xl">
+                            <h4 class="font-black text-[10px] uppercase tracking-widest text-slate-400 mb-4">Integración Inicial</h4>
+                            <div class="text-4xl font-extrabold text-slate-900 mb-6">$USD 0.00 <span class="text-xs text-slate-400 font-normal italic">*Bajo consulta</span></div>
+                            <ul class="space-y-3 text-sm text-slate-600 font-medium">
+                                <li class="flex items-center gap-2"><i data-lucide="check" class="w-4 h-4 text-green-500"></i> Setup de Dominio</li>
+                                <li class="flex items-center gap-2"><i data-lucide="check" class="w-4 h-4 text-green-500"></i> Personalización de Marca</li>
+                                <li class="flex items-center gap-2"><i data-lucide="check" class="w-4 h-4 text-green-500"></i> Seteo de WhatsApp Business</li>
+                            </ul>
+                        </div>
+                        <div class="p-8 bg-yellow-50 border-2 border-yellow-200 rounded-3xl relative overflow-hidden">
+                            <h4 class="font-black text-[10px] uppercase tracking-widest text-yellow-600 mb-4">Mantenimiento & SLA</h4>
+                            <div class="text-4xl font-extrabold text-slate-900 mb-6">$USD 15.00 <span class="text-xs text-slate-400 font-normal">/mes</span></div>
+                            <ul class="space-y-3 text-sm text-slate-800 font-semibold">
+                                <li class="flex items-center gap-2"><i data-lucide="shield-check" class="w-4 h-4 text-yellow-600"></i> Soporte Técnico 24/7</li>
+                                <li class="flex items-center gap-2"><i data-lucide="refresh-cw" class="w-4 h-4 text-yellow-600"></i> Actualización de Tarifas</li>
+                                <li class="flex items-center gap-2"><i data-lucide="globe" class="w-4 h-4 text-yellow-600"></i> Hosting Seguro (SSL)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <footer class="mt-32 pt-12 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-6 pb-20 text-slate-400">
+                    <p class="text-xs font-bold uppercase tracking-widest">© 2026 TaxiGO Mendoza. Mendoza Digital Ecosystem.</p>
+                    <div class="flex gap-8 text-[10px] font-black uppercase tracking-[0.2em]">
+                        <a href="#" class="hover:text-black">API SLA</a>
+                        <a href="#" class="hover:text-black">Políticas</a>
+                        <a href="#" class="hover:text-black">Legales</a>
+                    </div>
+                </footer>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // Scroll Spy Logic
+        const sections = document.querySelectorAll('section');
+        const navLinks = document.querySelectorAll('.nav-link');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (pageYOffset >= sectionTop - 120) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('sidebar-active');
+                if (link.getAttribute('href').includes(current)) {
+                    link.classList.add('sidebar-active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
