@@ -74,41 +74,36 @@
 
     // 1. Inicialización de Marca Blanca
     async function inicializarSaaS() {
-        try {
-            const res = await fetch(`/api/config/${slug}`);
-            const config = await res.json();
+    const params = new URLSearchParams(window.location.search);
+    const slug = params.get('v') || 'default';
 
-            if (!config) throw new Error("Configuración no válida");
-
-            empresaId = config._id;
-            
-            // Aplicar Marca Blanca
-            document.getElementById('empresa-nombre').innerText = config.nombre;
-            document.title = `Taxi - ${config.nombre}`;
-            document.documentElement.style.setProperty('--brand', config.config.color || '#2563eb');
-            document.getElementById('header-bg').style.backgroundColor = config.config.color || '#2563eb';
-            
-            if (config.logo) {
-                const img = document.getElementById('logo-img');
-                img.src = config.logo;
-                img.classList.remove('hidden');
-                document.getElementById('empresa-nombre').classList.add('hidden');
-            }
-
-            // Conexión Socket
-            socket = io({
-                path: '/api/socket',
-                query: { empresaId },
-                transports: ['polling', 'websocket']
-            });
-
-            configurarEscuchas();
-
-        } catch (error) {
-            console.error(error);
-            document.getElementById('empresa-nombre').innerText = "Error de conexión";
+    try {
+        const res = await fetch(`/api/config/${slug}`);
+        
+        // Si la respuesta no es OK, lanzamos error para capturarlo en el catch
+        if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.error || "Error en el servidor");
         }
+
+        const config = await res.json();
+        
+        // Aplicar marca blanca
+        document.getElementById('empresa-nombre').innerText = config.nombre;
+        document.documentElement.style.setProperty('--brand', config.config.color);
+        
+        // Conectar Socket
+        socket = io({
+            path: '/api/socket',
+            query: { empresaId: config._id }
+        });
+
+    } catch (error) {
+        console.error("Error de inicialización:", error);
+        document.getElementById('driver-info').innerText = "⚠️ Error de conexión: " + error.message;
+        document.getElementById('status-panel').classList.remove('hidden');
     }
+}
 
     // 2. Lógica de Sockets
     function configurarEscuchas() {

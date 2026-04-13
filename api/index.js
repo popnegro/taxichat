@@ -6,7 +6,6 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
 
-// IMPORTANTE: Verifica que estas rutas sean correctas
 const Empresa = require('../models/Empresa');
 const Viaje = require('../models/Viaje');
 
@@ -14,13 +13,30 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// Servir estáticos (Para que localhost:3000/client.html funcione)
+// Servir archivos estáticos desde la carpeta 'public'
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Conexión a MongoDB con log de errores
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log("✅ MongoDB Conectado con éxito"))
-    .catch(err => console.error("❌ Error al conectar MongoDB:", err));
+// --- CONEXIÓN A MONGODB ---
+const connectDB = async () => {
+    try {
+        await mongoose.connect(process.env.MONGO_URI);
+        console.log("✅ Conectado a MongoDB Atlas");
+        
+        // Crear slug default si no existe
+        const existe = await Empresa.findOne({ slug: 'default' });
+        if (!existe) {
+            await Empresa.create({
+                nombre: "Servicio Base",
+                slug: "default",
+                config: { color: "#2563eb", mpToken: "" }
+            });
+            console.log("⭐ Empresa 'default' creada");
+        }
+    } catch (err) {
+        console.error("❌ Error de conexión:", err.message);
+    }
+};
+connectDB();
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -28,32 +44,39 @@ const io = new Server(httpServer, {
     cors: { origin: "*" }
 });
 
-// --- RUTA CON ERROR 500 CONTROLADO ---
+// --- API ROUTES ---
 app.get('/api/config/:slug', async (req, res) => {
     try {
-        console.log(`🔍 Buscando configuración para: ${req.params.slug}`);
         let empresa = await Empresa.findOne({ slug: req.params.slug });
-        
         if (!empresa) {
-            console.log("⚠️ Slug no encontrado, intentando con 'default'");
             empresa = await Empresa.findOne({ slug: 'default' });
         }
-
-        if (!empresa) {
-            return res.status(404).json({ error: "No existe la empresa default en la DB" });
-        }
-
+        if (!empresa) return res.status(404).json({ error: "No hay empresa configurada" });
+        
         res.json(empresa);
     } catch (error) {
-        console.error("💥 ERROR CRÍTICO EN API:", error.message);
-        res.status(500).send("Error interno del servidor: " + error.message);
+        // Esto evita el error del token 'A' al enviar JSON en vez de texto plano
+        res.status(500).json({ error: "Error interno", details: error.message });
     }
 });
 
-// --- EXPORT Y ENCENDIDO ---
-const PORT = 3000;
+// --- SOCKETS ---
+io.on('connection', (socket) => {
+    const { empresaId } = socket.handshake.query;
+    if (empresaId) socket.join(empresaId);
+    
+    socket.on('nuevo-pedido', async (data) => {
+        const viaje = new Viaje({ ...data, empresaId, socketIdCliente: socket.id });
+        await viaje.save();
+        io.to(empresaId).emit('notificar-operador', viaje);
+    });
+});
+
+// --- ENCENDIDO LOCAL ---
+const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {
-    console.log(`\n🚀 SERVIDOR CORRIENDO EN http://localhost:${PORT}`);
+    console.log(`\n🚀 SERVIDOR ACTIVO EN http://localhost:${PORT}`);
+    console.log(`📡 PRUEBA API: http://localhost:${PORT}/api/config/default\n`);
 });
 
 module.exports = app;
