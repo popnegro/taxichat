@@ -1,69 +1,219 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TaxiChat - Cliente</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        @keyframes fade-in-down {
+            0% { opacity: 0; transform: translateY(-10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-down { animation: fade-in-down 0.3s ease-out forwards; }
+    </style>
 </head>
+<body class="bg-slate-50 min-h-screen text-slate-800">
 
-<body>
-    <div id="app">Cargando sistema...</div>
+    <div class="max-w-md mx-auto p-4">
+        <div class="flex items-center justify-between mb-6 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+            <h1 class="text-xl font-black text-slate-900 flex items-center gap-2">
+                <span class="bg-yellow-400 p-1 rounded-lg">🚕</span> TaxiChat
+            </h1>
+            <div id="status-container" class="flex items-center text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <span id="dot" class="w-2 h-2 bg-slate-300 rounded-full mr-2"></span>
+                <span id="status-text">Iniciando...</span>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/50 mb-8 border border-white">
+            <h3 class="text-lg font-bold mb-6 text-slate-800">Solicitar Taxi</h3>
+            
+            <div class="space-y-6">
+                <div class="relative">
+                    <div class="absolute left-[11px] top-7 bottom-4 w-0.5 bg-slate-100"></div>
+                    
+                    <div class="flex items-center mb-5 relative">
+                        <div class="z-10 w-6 h-6 bg-emerald-500 rounded-full border-4 border-white shadow-md"></div>
+                        <div class="relative w-full ml-4">
+                            <input type="text" id="origen" 
+                                class="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-400 pr-10 transition-all" 
+                                placeholder="📍 Buscando tu ubicación...">
+                            <button onclick="obtenerUbicacion()" class="absolute right-3 top-2.5 text-slate-400 hover:text-emerald-500 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center">
+                        <div class="z-10 w-6 h-6 bg-rose-500 rounded-full border-4 border-white shadow-md"></div>
+                        <div class="w-full ml-4">
+                            <input type="text" id="destino" oninput="calcularTarifa()"
+                                class="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-rose-400 transition-all" 
+                                placeholder="🏁 ¿A dónde vas?">
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Nombre Pasajero</label>
+                    <input type="text" id="pasajero" 
+                        class="w-full mt-1 bg-slate-50 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-yellow-400 transition-all" 
+                        placeholder="Tu nombre">
+                </div>
+
+                <div class="bg-yellow-50 p-4 rounded-2xl border border-yellow-100 flex justify-between items-center">
+                    <div>
+                        <p class="text-[10px] font-bold text-yellow-700 uppercase">Tarifa Sugerida</p>
+                        <p id="tarifa-display" class="text-2xl font-black text-yellow-900">$ 0.00</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] text-yellow-600/60 block font-bold">Mendoza, AR</span>
+                        <span class="text-xs text-yellow-700 font-bold bg-yellow-200/50 px-2 py-0.5 rounded-md">Efectivo</span>
+                    </div>
+                </div>
+
+                <button onclick="enviarViaje()" 
+                    class="w-full bg-slate-900 hover:bg-black text-white font-bold py-4 rounded-2xl shadow-xl shadow-slate-200 transform transition active:scale-95 flex items-center justify-center gap-3">
+                    <span class="tracking-wide">PEDIR COCHE</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="space-y-4">
+            <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest ml-2">Actividad Reciente</h4>
+            <div id="lista-viajes" class="space-y-3">
+                </div>
+        </div>
+    </div>
 
     <script>
-        let config = {};
         let socket;
+        let googleMapsLoaded = false;
 
-        async function inicializarSaaS() {
+        async function inicializarApp() {
+            const statusText = document.getElementById('status-text');
+            const dot = document.getElementById('dot');
+            
             try {
-                console.log("Iniciando conexión con el núcleo...");
-                const respuesta = await fetch('/api/config/default');
-                config = await respuesta.json();
+                // 1. Obtener Configuración
+                const res = await fetch('/api/config/default');
+                const config = await res.json();
 
-                // 1. Evitar error de color (Línea 93 protegida)
-                const colorApp = config?.tema?.color || '#FFD700';
-
-                // 2. Inicializar Socket con path corregido
+                // 2. Conexión Socket.io (Polling para Vercel)
                 socket = io({
                     path: '/api/socket',
                     addTrailingSlash: false,
-                    // Priorizamos polling que es lo que Vercel acepta mejor de entrada
-                    transports: ['polling', 'websocket'],
-                    upgrade: true,
-                    rememberUpgrade: true,
-                    timeout: 20000 // Le damos un poco más de tiempo para el apretón de manos
+                    transports: ['polling'],
+                    upgrade: false
                 });
 
                 socket.on('connect', () => {
-                    console.log("✅ Conectado con ID:", socket.id);
-
-                    // Enviamos un mensaje de prueba
-                    socket.emit('nuevo-viaje', {
-                        pasajero: "Prueba Sistema",
-                        destino: "Mendoza Centro"
-                    });
+                    statusText.innerText = "Conectado";
+                    dot.classList.replace('bg-slate-300', 'bg-emerald-500');
+                    dot.classList.add('animate-pulse');
+                    obtenerUbicacion(); // Geolocalizar al conectar
                 });
 
                 socket.on('viaje-recibido', (data) => {
-                    console.log("🚀 ¡Mensaje recibido desde el servidor!", data);
+                    renderizarViaje(data);
                 });
-                // 3. Cargar Maps dinámicamente
+
+                // 3. Cargar Google Maps para Geocoding
                 if (config.googleMapsKey) {
                     const script = document.createElement('script');
                     script.src = `https://maps.googleapis.com/maps/api/js?key=${config.googleMapsKey}`;
+                    script.onload = () => { googleMapsLoaded = true; };
                     document.head.appendChild(script);
                 }
 
-                document.getElementById('app').innerText = "SaaS inicializado correctamente.";
-
-            } catch (error) {
-                console.error("Error de inicialización:", error);
+            } catch (e) {
+                statusText.innerText = "Error de Red";
+                dot.classList.replace('bg-slate-300', 'bg-rose-500');
             }
         }
 
-        window.onload = inicializarSaaS;
+        function obtenerUbicacion() {
+            const origenInput = document.getElementById('origen');
+            if (!navigator.geolocation) return;
+
+            navigator.geolocation.getCurrentPosition((pos) => {
+                const { latitude, longitude } = pos.coords;
+                
+                if (googleMapsLoaded) {
+                    const geocoder = new google.maps.Geocoder();
+                    geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results, status) => {
+                        if (status === "OK" && results[0]) {
+                            origenInput.value = results[0].formatted_address.split(',')[0] + ", " + results[0].formatted_address.split(',')[1];
+                        }
+                    });
+                } else {
+                    origenInput.value = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+                }
+            });
+        }
+
+        function calcularTarifa() {
+            const destino = document.getElementById('destino').value;
+            const display = document.getElementById('tarifa-display');
+            if (destino.length > 3) {
+                const estimado = Math.floor(Math.random() * (4500 - 1500) + 1500);
+                display.innerText = `$ ${estimado.toLocaleString('es-AR')}`;
+            }
+        }
+
+        function enviarViaje() {
+            const campos = {
+                origen: document.getElementById('origen').value,
+                destino: document.getElementById('destino').value,
+                pasajero: document.getElementById('pasajero').value,
+                tarifa: document.getElementById('tarifa-display').innerText
+            };
+
+            if (!campos.origen || !campos.destino || !campos.pasajero) {
+                alert("Completa el roadmap para pedir tu coche.");
+                return;
+            }
+
+            socket.emit('nuevo-viaje', {
+                ...campos,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            });
+
+            // Limpiar para nueva solicitud
+            document.getElementById('destino').value = '';
+            document.getElementById('tarifa-display').innerText = '$ 0.00';
+        }
+
+        function renderizarViaje(data) {
+            const lista = document.getElementById('lista-viajes');
+            const item = document.createElement('div');
+            item.className = "bg-white p-4 rounded-2xl border border-slate-100 shadow-sm animate-fade-in-down";
+            item.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <div class="space-y-1">
+                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-tighter">${data.timestamp}</p>
+                        <p class="text-sm font-bold text-slate-800">${data.pasajero}</p>
+                        <p class="text-xs text-slate-500">📍 ${data.origen.substring(0,25)}...</p>
+                        <p class="text-xs text-slate-500 font-medium italic">🏁 ${data.destino}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm font-black text-emerald-600">${data.tarifa}</p>
+                        <span class="text-[9px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full font-bold">BUSCANDO</span>
+                    </div>
+                </div>
+            `;
+            lista.prepend(item);
+        }
+
+        window.onload = inicializarApp;
     </script>
 </body>
-
 </html>

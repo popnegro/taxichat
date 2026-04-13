@@ -4,71 +4,198 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TaxiChat - Panel de Operador</title>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f6; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; width: 350px; }
-        h2 { color: #333; margin-bottom: 10px; }
-        #map-status { font-size: 12px; color: #666; margin-top: 15px; }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 2s linear infinite; margin: 10px auto; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes pulse-border {
+            0% { border-color: rgba(250, 204, 21, 0.5); }
+            50% { border-color: rgba(250, 204, 21, 1); }
+            100% { border-color: rgba(250, 204, 21, 0.5); }
+        }
+        .nueva-solicitud { animation: pulse-border 2s infinite; }
     </style>
 </head>
-<body>
+<body class="bg-slate-900 min-h-screen text-slate-100 font-sans">
 
-    <div class="container" id="login-card">
-        <h2>Operadores</h2>
-        <p>Inicia sesión para gestionar la flota</p>
-        <div id="loader" class="loader"></div>
-        
-        <div id="g_id_onload" data-context="signin" data-ux_mode="popup" data-callback="handleLogin" data-auto_prompt="false"></div>
-        <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="outline" data-text="signin_with" data-size="large" data-logo_alignment="left"></div>
-        
-        <div id="map-status">Cargando módulos de Maps...</div>
+    <div class="max-w-5xl mx-auto p-4 md:p-8">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-2xl">
+            <div>
+                <h1 class="text-2xl font-black tracking-tight flex items-center gap-2">
+                    <span class="text-yellow-400">◉</span> CENTRAL OPERATIVA
+                </h1>
+                <p class="text-slate-400 text-sm font-medium">Gestión de flota en tiempo real</p>
+            </div>
+            
+            <div class="flex items-center gap-6">
+                <div class="text-right">
+                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Estado Servidor</p>
+                    <div class="flex items-center justify-end gap-2">
+                        <span id="status-text" class="text-sm font-bold text-emerald-400">Conectado</span>
+                        <span id="dot" class="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></span>
+                    </div>
+                </div>
+                <div class="h-10 w-px bg-slate-700"></div>
+                <div class="bg-slate-900 px-4 py-2 rounded-xl border border-slate-700">
+                    <span id="contador-viajes" class="text-xl font-black text-yellow-400">0</span>
+                    <span class="text-[10px] font-bold text-slate-500 uppercase ml-2 tracking-tighter">Viajes Hoy</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-4">
+                <div class="flex items-center justify-between px-2">
+                    <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest">Solicitudes en Espera</h2>
+                    <span class="text-[10px] bg-slate-800 text-slate-400 px-2 py-1 rounded-md border border-slate-700">LIVE</span>
+                </div>
+
+                <div id="panel-solicitudes" class="space-y-4">
+                    <div id="empty-state" class="flex flex-col items-center justify-center py-20 bg-slate-800/50 rounded-3xl border-2 border-dashed border-slate-700 text-slate-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-4 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p class="font-medium">No hay pedidos pendientes</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <div class="bg-slate-800 p-6 rounded-3xl border border-slate-700">
+                    <h3 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">Acciones Rápidas</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button class="bg-slate-700 hover:bg-slate-600 p-4 rounded-2xl transition-all text-center group">
+                            <span class="block text-xl mb-1 group-hover:scale-110 transition-transform">📢</span>
+                            <span class="text-[10px] font-bold">Aviso Flota</span>
+                        </button>
+                        <button class="bg-slate-700 hover:bg-slate-600 p-4 rounded-2xl transition-all text-center group">
+                            <span class="block text-xl mb-1 group-hover:scale-110 transition-transform">🗺️</span>
+                            <span class="text-[10px] font-bold">Mapa General</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-yellow-400 p-6 rounded-3xl border border-yellow-500 shadow-xl shadow-yellow-400/10">
+                    <h3 class="text-slate-900 font-black text-sm uppercase tracking-widest mb-1">Modo Emergencia</h3>
+                    <p class="text-yellow-900 text-xs mb-4 font-medium italic opacity-80">Bloquear nuevas solicitudes</p>
+                    <button class="w-full bg-slate-900 text-white font-bold py-3 rounded-xl active:scale-95 transition-all text-xs">
+                        ACTIVAR BLOQUEO
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
+    <audio id="alert-sound" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3" preload="auto"></audio>
+
     <script>
-        async function init() {
-            try {
-                const res = await fetch('/api/config/default');
-                const config = await res.json();
+        let socket;
+        let totalViajes = 0;
 
-                if (config.error) throw new Error(config.error);
+        function inicializarOperador() {
+            const statusText = document.getElementById('status-text');
+            const dot = document.getElementById('dot');
 
-                // 1. Configurar ID de Cliente para Google Login
-                document.getElementById('g_id_onload').setAttribute('data-client_id', config.googleClientId);
-
-                // 2. Cargar Google Maps dinámicamente
-                const script = document.createElement('script');
-                script.src = `https://maps.googleapis.com/maps/api/js?key=${config.googleMapsKey}&libraries=places`;
-                script.onload = () => {
-                    document.getElementById('map-status').innerText = "Maps cargado correctamente";
-                    document.getElementById('loader').style.display = 'none';
-                };
-                document.head.appendChild(script);
-
-            } catch (err) {
-                console.error("Error al inicializar:", err);
-                document.getElementById('map-status').innerHTML = "<b style='color:red'>Error de configuración. Revisa Vercel.</b>";
-            }
-        }
-
-        async function handleLogin(response) {
-            const result = await fetch('/api/auth/google', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: response.credential, role: 'operator' })
+            // Conexión idéntica a client.html para coherencia en Vercel
+            socket = io({
+                path: '/api/socket',
+                addTrailingSlash: false,
+                transports: ['polling'],
+                upgrade: false
             });
 
-            const data = await result.json();
-            if (data.success) {
-                window.location.href = '/panel-operador.html';
-            } else {
-                alert("Acceso denegado: " + data.message);
-            }
+            socket.on('connect', () => {
+                statusText.innerText = "Conectado";
+                dot.classList.replace('bg-slate-500', 'bg-emerald-500');
+            });
+
+            socket.on('disconnect', () => {
+                statusText.innerText = "Desconectado";
+                dot.classList.replace('bg-emerald-500', 'bg-rose-500');
+            });
+
+            // ESCUCHAR EVENTOS DEL CLIENTE
+            socket.on('viaje-recibido', (data) => {
+                gestionarNuevaSolicitud(data);
+            });
         }
 
-        window.onload = init;
+        function gestionarNuevaSolicitud(data) {
+            const panel = document.getElementById('panel-solicitudes');
+            const emptyState = document.getElementById('empty-state');
+            const sound = document.getElementById('alert-sound');
+
+            if (emptyState) emptyState.remove();
+
+            // Notificación sonora
+            sound.play().catch(e => console.log("Audio bloqueado por navegador"));
+
+            // Crear Tarjeta de Operador
+            const card = document.createElement('div');
+            card.className = "bg-slate-800 p-6 rounded-3xl border-2 border-slate-700 nueva-solicitud shadow-xl transition-all animate-fade-in";
+            
+            card.innerHTML = `
+                <div class="flex flex-col md:flex-row justify-between gap-6">
+                    <div class="flex-1 space-y-4">
+                        <div class="flex items-center gap-3">
+                            <span class="bg-emerald-500/10 text-emerald-400 text-[10px] font-black px-2 py-1 rounded-md border border-emerald-500/20">NUEVA PETICIÓN</span>
+                            <span class="text-slate-500 text-[10px] font-bold tracking-widest uppercase">${data.timestamp}</span>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-slate-900/50 p-3 rounded-xl">
+                                <p class="text-[9px] text-slate-500 font-black uppercase mb-1 tracking-tighter text-emerald-400">Recogida en</p>
+                                <p class="text-sm font-bold text-white truncate">${data.origen}</p>
+                            </div>
+                            <div class="bg-slate-900/50 p-3 rounded-xl">
+                                <p class="text-[9px] text-slate-500 font-black uppercase mb-1 tracking-tighter text-rose-400">Destino final</p>
+                                <p class="text-sm font-bold text-white truncate">${data.destino}</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-4 text-sm">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center font-bold text-yellow-400">
+                                    ${data.pasajero.charAt(0).toUpperCase()}
+                                </div>
+                                <span class="font-bold text-slate-200">${data.pasajero}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="md:w-48 flex flex-col justify-between border-t md:border-t-0 md:border-l border-slate-700 pt-4 md:pt-0 md:pl-6">
+                        <div class="text-right mb-4">
+                            <p class="text-[10px] text-slate-500 font-black uppercase mb-1">Precio Sugerido</p>
+                            <p class="text-2xl font-black text-white italic">${data.tarifa}</p>
+                        </div>
+                        <div class="space-y-2">
+                            <button onclick="aceptarViaje(this)" class="w-full bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-black py-2 rounded-xl text-xs transition-colors">
+                                ACEPTAR
+                            </button>
+                            <button onclick="this.closest('.nueva-solicitud').remove()" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-2 rounded-xl text-xs transition-colors">
+                                IGNORAR
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            panel.prepend(card);
+            
+            // Actualizar contador
+            totalViajes++;
+            document.getElementById('contador-viajes').innerText = totalViajes;
+        }
+
+        function aceptarViaje(btn) {
+            const card = btn.closest('.nueva-solicitud');
+            card.style.borderColor = "#10b981"; // Cambiar a verde esmeralda
+            card.classList.remove('nueva-solicitud');
+            btn.innerHTML = "✓ ASIGNADO";
+            btn.disabled = true;
+            btn.className = "w-full bg-emerald-500/20 text-emerald-500 font-black py-2 rounded-xl text-xs border border-emerald-500/30";
+        }
+
+        window.onload = inicializarOperador;
     </script>
 </body>
 </html>
