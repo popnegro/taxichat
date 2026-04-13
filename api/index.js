@@ -1,61 +1,72 @@
-require('dotenv').config();
+const path = require('path');
+// 1. CARGA DE VARIABLES DE ENTORNO (Prioridad Máxima)
+// Intentamos cargar desde la raíz (un nivel arriba de /api)
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+
 const express = require('express');
 const { createServer } = require('node:http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const mongoose = require('mongoose');
-const path = require('path');
-const { MercadoPagoConfig, Preference } = require('mercadopago');
 
-// Importación de Modelos
+// 2. IMPORTACIÓN DE MODELOS
+// Asegúrate de que los archivos existan en /models con estos nombres exactos
 const Empresa = require('../models/Empresa');
 const Viaje = require('../models/Viaje');
 
 const app = express();
-
-// --- MIDDLEWARES ---
 app.use(express.json());
 app.use(cors());
 
-// Permitir que el sitio sea insertado en iframes (Widget)
+// Permitir visualización en Iframes (para el widget)
 app.use((req, res, next) => {
     res.setHeader("Content-Security-Policy", "frame-ancestors *");
     next();
 });
 
-// Servir archivos estáticos (Local y Vercel)
+// Servir archivos estáticos de la carpeta /public
 app.use(express.static(path.join(__dirname, '../public')));
 
-// --- CONEXIÓN MONGODB (CACHEADA) ---
+// 3. CONEXIÓN A MONGODB (Resistente a Serverless)
 let isConnected = false;
-async function connectDB() {
+
+const connectDB = async () => {
     if (isConnected) return;
+    
+    const uri = process.env.MONGO_URI;
+    
+    if (!uri) {
+        console.error("❌ ERROR: La variable MONGO_URI no está definida.");
+        console.error("👉 Revisa que el archivo .env esté en la raíz del proyecto.");
+        return;
+    }
+
     try {
-        await mongoose.connect(process.env.MONGO_URI);
+        await mongoose.connect(uri);
         isConnected = true;
-        console.log("✅ MongoDB Conectado");
-        
-        // Crear slug default si no existe
-        const existe = await Empresa.findOne({ slug: 'default' });
-        if (!existe) {
+        console.log("✅ Conexión exitosa a MongoDB Atlas");
+
+        // Crear slug 'default' automáticamente si la DB está vacía
+        const existeDefault = await Empresa.findOne({ slug: 'default' });
+        if (!existeDefault) {
             await Empresa.create({
-                nombre: "Servicio Base",
+                nombre: "Taxichat Global",
                 slug: "default",
                 config: { color: "#2563eb", mpToken: "" }
             });
+            console.log("⭐ Registro 'default' creado en la base de datos.");
         }
     } catch (err) {
-        console.error("❌ Error DB:", err.message);
+        console.error("❌ Error al conectar a MongoDB:", err.message);
     }
-}
+};
 
-// Inyectar conexión en cada request
+// Middleware para asegurar conexión en cada petición
 app.use(async (req, res, next) => {
     await connectDB();
     next();
 });
 
-// --- CONFIGURACIÓN SOCKET.IO ---
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     path: '/api/socket',
@@ -64,84 +75,67 @@ const io = new Server(httpServer, {
     transports: ['polling', 'websocket']
 });
 
+// 4. LÓGICA DE SOCKETS
 io.on('connection', (socket) => {
     const { empresaId } = socket.handshake.query;
     if (empresaId) socket.join(empresaId);
 
-    console.log(`🔌 Nuevo cliente en empresa: ${empresaId}`);
+    console.log(`🔌 Cliente conectado a empresa: ${empresaId || 'Sin ID'}`);
 
     socket.on('nuevo-pedido', async (data) => {
-        const viaje = new Viaje({ ...data, empresaId, socketIdCliente: socket.id });
-        await viaje.save();
-        io.to(empresaId).emit('notificar-operador', viaje);
+        try {
+            const viaje = new Viaje({ ...data, empresaId, socketIdCliente: socket.id });
+            await viaje.save();
+            io.to(empresaId).emit('notificar-operador', viaje);
+        } catch (e) {
+            console.error("Error al guardar pedido:", e.message);
+        }
     });
 
     socket.on('confirmar-viaje', async (data) => {
         const v = await Viaje.findByIdAndUpdate(data.viajeId, { 
             chofer: data.chofer, 
-            tiempoEstimado: data.tiempoEstimado, 
             estado: 'confirmado' 
         }, { new: true });
         if (v) io.to(v.socketIdCliente).emit('confirmacion-cliente', v);
     });
 });
 
-// --- RUTAS API ---
-
-// Configuración de Marca Blanca
+// 5. RUTAS DE LA API
 app.get('/api/config/:slug', async (req, res) => {
     try {
         let empresa = await Empresa.findOne({ slug: req.params.slug });
         if (!empresa) empresa = await Empresa.findOne({ slug: 'default' });
+        
+        if (!empresa) return res.status(404).json({ error: "No hay configuración" });
         res.json(empresa);
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(500).json({ error: "Error en el servidor", detalle: e.message });
     }
 });
 
-// SuperAdmin: Listar empresas
 app.get('/api/superadmin/empresas', async (req, res) => {
-    const empresas = await Empresa.find().sort({ fechaRegistro: -1 });
-    res.json(empresas);
-});
-
-// Mercado Pago: Generar Link
-app.post('/api/pagos/crear-link', async (req, res) => {
-    const { viajeId, monto, empresaId } = req.body;
     try {
-        const empresa = await Empresa.findById(empresaId);
-        if (!empresa?.config?.mpToken) return res.status(400).send("Token MP faltante");
-
-        const client = new MercadoPagoConfig({ accessToken: empresa.config.mpToken });
-        const preference = new Preference(client);
-        
-        const result = await preference.create({
-            body: {
-                items: [{ title: `Viaje Taxichat`, quantity: 1, unit_price: Number(monto), currency_id: 'ARS' }],
-                back_urls: { success: `https://${req.headers.host}/pago-exitoso.html` },
-                auto_return: "approved",
-            }
-        });
-
-        const viaje = await Viaje.findById(viajeId);
-        if (viaje) {
-            io.to(viaje.socketIdCliente).emit('recibir-pago', { link: result.init_point, monto });
-        }
-        res.json({ link: result.init_point });
+        const empresas = await Empresa.find().sort({ fechaRegistro: -1 });
+        res.json(empresas);
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
 });
 
-// --- MANEJO DE ENCENDIDO (Local vs Vercel) ---
+// 6. EXPORTACIÓN Y ENCENDIDO
+const PORT = process.env.PORT || 3000;
+
 if (process.env.NODE_ENV !== 'production') {
-    const PORT = 3000;
     httpServer.listen(PORT, () => {
-        console.log(`🚀 Servidor local en http://localhost:${PORT}`);
+        console.log("-----------------------------------------");
+        console.log(`🚀 SERVIDOR LOCAL: http://localhost:${PORT}`);
+        console.log(`📂 PÚBLICO: http://localhost:${PORT}/client.html`);
+        console.log("-----------------------------------------");
     });
 }
 
-// Exportación para Vercel
+// Necesario para que Socket.io funcione en Vercel
 module.exports = (req, res) => {
     if (!res.socket.server.io) {
         res.socket.server.io = io;
