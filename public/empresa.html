@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radio Taxi VIP - Pide tu viaje</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos del Widget Flotante (oculto por defecto) */
+        #taxichat-fixed-container {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            /* Empieza invisible y desplazado hacia abajo */
+            transform: translateY(100px);
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* Clase para mostrar el flotante cuando el hero desaparece */
+        #taxichat-fixed-container.visible {
+            transform: translateY(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #taxichat-window {
+            width: 380px;
+            height: 0;
+            opacity: 0;
+            overflow: hidden;
+            border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+            margin-bottom: 15px;
+            transition: all 0.4s ease;
+            background: white;
+            border: 1px solid #f1f5f9;
+        }
+
+        #taxichat-window.open {
+            height: 600px;
+            opacity: 1;
+        }
+
+        #taxichat-button {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #2563eb;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(37, 99, 235, 0.3);
+            transition: 0.3s;
+        }
+
+        .icon-close { display: none; }
+        .open-state .icon-close { display: block; }
+        .open-state .icon-taxi { display: none; }
+
+        @media (max-width: 480px) {
+            #taxichat-window { width: 90vw; }
+        }
+    </style>
+</head>
+<body class="bg-white">
+
+    <header id="hero-section" class="min-h-screen bg-slate-50 flex flex-col md:flex-row items-center justify-between px-6 lg:px-20 py-10 gap-10">
+        <div class="md:w-1/2 space-y-6">
+            <h1 class="text-6xl font-black text-slate-900 leading-tight">Tu viaje seguro <br><span class="text-blue-600 font-black italic underline">al instante.</span></h1>
+            <p class="text-xl text-slate-500">Pide tu taxi ahora mismo usando nuestro asistente digital. Sin esperas telefónicas, con seguimiento real.</p>
+            <div class="flex items-center space-x-4 pt-4">
+                <div class="flex -space-x-2">
+                    <div class="w-10 h-10 rounded-full bg-slate-300 border-2 border-white"></div>
+                    <div class="w-10 h-10 rounded-full bg-slate-400 border-2 border-white"></div>
+                    <div class="w-10 h-10 rounded-full bg-slate-500 border-2 border-white"></div>
+                </div>
+                <p class="text-sm font-bold text-slate-600">+5,000 viajes realizados este mes</p>
+            </div>
+        </div>
+
+        <div class="md:w-[400px] w-full h-[600px] bg-white rounded-[2rem] shadow-2xl overflow-hidden border-8 border-white">
+            <iframe id="hero-iframe" src="/client.html?v=mendoza" class="w-full h-full border-none"></iframe>
+        </div>
+    </header>
+
+    <section class="py-24 max-w-6xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
+        <div class="p-8">
+            <h3 class="font-bold text-xl mb-3">Conductores Verificados</h3>
+            <p class="text-slate-500">Todos nuestros choferes pasan por un riguroso proceso de seguridad.</p>
+        </div>
+        <div class="p-8">
+            <h3 class="font-bold text-xl mb-3">Pagos Digitales</h3>
+            <p class="text-slate-500">Paga con Mercado Pago directamente desde el chat.</p>
+        </div>
+        <div class="p-8">
+            <h3 class="font-bold text-xl mb-3">Soporte 24/7</h3>
+            <p class="text-slate-500">Nuestros operadores están siempre listos para ayudarte.</p>
+        </div>
+    </section>
+
+    <div class="h-screen bg-slate-900 flex items-center justify-center">
+        <h2 class="text-4xl font-bold text-white">Seguimos bajando...</h2>
+    </div>
+
+    <div id="taxichat-fixed-container">
+        <div id="taxichat-window">
+            <iframe id="fixed-iframe" src="" style="width:100%; height:100%; border:none;"></iframe>
+        </div>
+
+        <div id="taxichat-button" onclick="toggleChat()">
+            <svg class="icon-taxi h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+            <svg class="icon-close h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </div>
+    </div>
+
+    <script>
+        const heroSection = document.getElementById('hero-section');
+        const fixedContainer = document.getElementById('taxichat-fixed-container');
+        const fixedIframe = document.getElementById('fixed-iframe');
+        const slug = "mendoza"; // Configura el slug aquí
+
+        // 1. Intersection Observer para detectar cuando el Hero sale de pantalla
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (!entry.isIntersecting) {
+                    // El Hero NO es visible -> Mostrar botón flotante
+                    fixedContainer.classList.add('visible');
+                    // Cargar el iframe si aún no tiene SRC (Lazy Load)
+                    if (!fixedIframe.src) {
+                        fixedIframe.src = `/client.html?v=${slug}`;
+                    }
+                } else {
+                    // El Hero es visible -> Ocultar botón flotante
+                    fixedContainer.classList.remove('visible');
+                    document.getElementById('taxichat-window').classList.remove('open');
+                    fixedContainer.classList.remove('open-state');
+                }
+            });
+        }, { threshold: 0.1 }); // Se activa cuando solo queda el 10% del hero visible
+
+        observer.observe(heroSection);
+
+        // 2. Abrir/Cerrar Chat Flotante
+        function toggleChat() {
+            const win = document.getElementById('taxichat-window');
+            const cont = document.getElementById('taxichat-fixed-container');
+            win.classList.toggle('open');
+            cont.classList.toggle('open-state');
+        }
+
+        // 3. Sincronizar colores
+        async function fetchConfig() {
+            try {
+                const res = await fetch(`/api/config/${slug}`);
+                const config = await res.json();
+                if(config.config.color) {
+                    document.getElementById('taxichat-button').style.backgroundColor = config.config.color;
+                    document.getElementById('taxichat-button').style.boxShadow = `0 10px 20px ${config.config.color}44`;
+                }
+            } catch(e) {}
+        }
+        fetchConfig();
+    </script>
+</body>
+</html>

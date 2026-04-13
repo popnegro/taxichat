@@ -4,16 +4,25 @@ const { createServer } = require('node:http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const { MercadoPagoConfig, Preference } = require('mercadopago');
 
 // Modelos
 const Empresa = require('../models/Empresa');
 const Viaje = require('../models/Viaje');
 
 const app = express();
+
+// --- MIDDLEWARES (Orden Crítico) ---
 app.use(express.json());
 app.use(cors());
 
-// Conexión a MongoDB (con caché para evitar múltiples conexiones en serverless)
+// Permitir iframes (Debe ir antes de las rutas)
+app.use((req, res, next) => {
+    res.setHeader("Content-Security-Policy", "frame-ancestors *");
+    next();
+});
+
+// Conexión a MongoDB con Caché
 let cachedDb = null;
 async function connectToDatabase() {
     if (cachedDb) return cachedDb;
@@ -22,25 +31,22 @@ async function connectToDatabase() {
     return db;
 }
 
+app.use(async (req, res, next) => {
+    try {
+        await connectToDatabase();
+        next();
+    } catch (err) {
+        res.status(500).json({ error: "Error de conexión a base de datos" });
+    }
+});
+
+// --- SOCKET.IO SETUP ---
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: { origin: "*" },
-    path: '/api/socket' // Ruta específica para los sockets en Vercel
+    path: '/api/socket'
 });
 
-// Middlewares
-app.use(async (req, res, next) => {
-    await connectToDatabase();
-    next();
-});
-
-// API Routes
-app.get('/api/config/:slug', async (req, res) => {
-    const empresa = await Empresa.findOne({ slug: req.params.slug });
-    res.json(empresa);
-});
-
-// Sockets
 io.on('connection', (socket) => {
     const { empresaId } = socket.handshake.query;
     if (empresaId) socket.join(empresaId);
@@ -55,20 +61,30 @@ io.on('connection', (socket) => {
         const v = await Viaje.findByIdAndUpdate(data.viajeId, { 
             chofer: data.chofer, estado: 'confirmado' 
         }, { new: true });
-        io.to(v.socketIdCliente).emit('confirmacion-cliente', v);
+        if (v) io.to(v.socketIdCliente).emit('confirmacion-cliente', v);
     });
 });
 
-// Exportar para Vercel
-module.exports = (req, res) => {
-    if (!res.socket.server.io) {
-        res.socket.server.io = io;
-        io.attach(res.socket.server);
-    }
-    app(req, res);
-};
+// --- RUTAS API ---
 
-// 1. Listar todas las empresas (Para el SuperAdmin)
+// Configuración de Empresa por Slug (Público)
+app.get('/api/config/:slug', async (req, res) => {
+    const empresa = await Empresa.findOne({ slug: req.params.slug });
+    res.json(empresa);
+});
+
+// Crear Empresa (Faltaba esta ruta)
+app.post('/api/empresas', async (req, res) => {
+    try {
+        const nueva = new Empresa(req.body);
+        await nueva.save();
+        res.json(nueva);
+    } catch (error) {
+        res.status(500).json({ error: "Error al crear empresa" });
+    }
+});
+
+// SuperAdmin: Listar
 app.get('/api/superadmin/empresas', async (req, res) => {
     try {
         const empresas = await Empresa.find().sort({ fechaRegistro: -1 });
@@ -78,28 +94,71 @@ app.get('/api/superadmin/empresas', async (req, res) => {
     }
 });
 
-// 2. Editar una empresa existente
+// SuperAdmin: Editar
 app.put('/api/superadmin/empresas/:id', async (req, res) => {
     try {
-        const empresaActualizada = await Empresa.findByIdAndUpdate(
-            req.params.id, 
-            req.body, 
-            { new: true }
-        );
+        const empresaActualizada = await Empresa.findByIdAndUpdate(req.params.id, req.body, { new: true });
         res.json(empresaActualizada);
     } catch (error) {
-        res.status(500).json({ error: "Error al actualizar la empresa" });
+        res.status(500).json({ error: "Error al actualizar" });
     }
 });
 
-// 3. Eliminar una empresa y sus viajes asociados
+// SuperAdmin: Eliminar
 app.delete('/api/superadmin/empresas/:id', async (req, res) => {
     try {
-        const id = req.params.id;
-        await Empresa.findByIdAndDelete(id);
-        await Viaje.deleteMany({ empresaId: id }); // Limpieza de datos
-        res.json({ message: "Empresa y datos eliminados correctamente" });
+        await Empresa.findByIdAndDelete(req.params.id);
+        await Viaje.deleteMany({ empresaId: req.params.id });
+        res.json({ message: "Eliminado correctamente" });
     } catch (error) {
         res.status(500).json({ error: "Error al eliminar" });
     }
 });
+
+// Mercado Pago: Generar Link
+app.post('/api/pagos/crear-link', async (req, res) => {
+    const { viajeId, monto, empresaId } = req.body;
+    try {
+        const empresa = await Empresa.findById(empresaId);
+        if (!empresa || !empresa.config.mpToken) {
+            return res.status(400).json({ error: "Mercado Pago no configurado" });
+        }
+
+        const client = new MercadoPagoConfig({ accessToken: empresa.config.mpToken });
+        const preference = new Preference(client);
+
+        const result = await preference.create({
+            body: {
+                items: [{
+                    title: `Viaje taxichat`,
+                    quantity: 1,
+                    unit_price: Number(monto),
+                    currency_id: 'ARS'
+                }],
+                back_urls: { success: `https://${req.headers.host}/pago-exitoso.html` },
+                auto_return: "approved",
+            }
+        });
+
+        const viaje = await Viaje.findById(viajeId);
+        if (viaje) {
+            io.to(viaje.socketIdCliente).emit('recibir-pago', {
+                link: result.init_point,
+                monto: monto
+            });
+        }
+
+        res.json({ link: result.init_point });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// --- EXPORT PARA VERCEL (Siempre al final) ---
+module.exports = (req, res) => {
+    if (!res.socket.server.io) {
+        res.socket.server.io = io;
+        io.attach(res.socket.server);
+    }
+    app(req, res);
+};
