@@ -93,10 +93,12 @@
         document.documentElement.style.setProperty('--brand', config.config.color);
         
         // Conectar Socket
-        socket = io({
-            path: '/api/socket',
-            query: { empresaId: config._id }
-        });
+       socket = io({
+    path: '/api/socket', 
+    addTrailingSlash: false, // Evita que agregue / extra y cause 404
+    query: { empresaId: config._id },
+    transports: ['polling', 'websocket'] // Vercel requiere polling primero
+});
 
     } catch (error) {
         console.error("Error de inicialización:", error);

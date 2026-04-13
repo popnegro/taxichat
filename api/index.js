@@ -5,22 +5,35 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
+const { MercadoPagoConfig, Preference } = require('mercadopago');
 
+// Importación de Modelos
 const Empresa = require('../models/Empresa');
 const Viaje = require('../models/Viaje');
 
 const app = express();
+
+// --- MIDDLEWARES ---
 app.use(express.json());
 app.use(cors());
 
-// Servir archivos estáticos desde la carpeta 'public'
+// Permitir que el sitio sea insertado en iframes (Widget)
+app.use((req, res, next) => {
+    res.setHeader("Content-Security-Policy", "frame-ancestors *");
+    next();
+});
+
+// Servir archivos estáticos (Local y Vercel)
 app.use(express.static(path.join(__dirname, '../public')));
 
-// --- CONEXIÓN A MONGODB ---
-const connectDB = async () => {
+// --- CONEXIÓN MONGODB (CACHEADA) ---
+let isConnected = false;
+async function connectDB() {
+    if (isConnected) return;
     try {
         await mongoose.connect(process.env.MONGO_URI);
-        console.log("✅ Conectado a MongoDB Atlas");
+        isConnected = true;
+        console.log("✅ MongoDB Conectado");
         
         // Crear slug default si no existe
         const existe = await Empresa.findOne({ slug: 'default' });
@@ -30,53 +43,109 @@ const connectDB = async () => {
                 slug: "default",
                 config: { color: "#2563eb", mpToken: "" }
             });
-            console.log("⭐ Empresa 'default' creada");
         }
     } catch (err) {
-        console.error("❌ Error de conexión:", err.message);
+        console.error("❌ Error DB:", err.message);
     }
-};
-connectDB();
+}
 
+// Inyectar conexión en cada request
+app.use(async (req, res, next) => {
+    await connectDB();
+    next();
+});
+
+// --- CONFIGURACIÓN SOCKET.IO ---
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     path: '/api/socket',
-    cors: { origin: "*" }
+    addTrailingSlash: false,
+    cors: { origin: "*" },
+    transports: ['polling', 'websocket']
 });
 
-// --- API ROUTES ---
-app.get('/api/config/:slug', async (req, res) => {
-    try {
-        let empresa = await Empresa.findOne({ slug: req.params.slug });
-        if (!empresa) {
-            empresa = await Empresa.findOne({ slug: 'default' });
-        }
-        if (!empresa) return res.status(404).json({ error: "No hay empresa configurada" });
-        
-        res.json(empresa);
-    } catch (error) {
-        // Esto evita el error del token 'A' al enviar JSON en vez de texto plano
-        res.status(500).json({ error: "Error interno", details: error.message });
-    }
-});
-
-// --- SOCKETS ---
 io.on('connection', (socket) => {
     const { empresaId } = socket.handshake.query;
     if (empresaId) socket.join(empresaId);
-    
+
+    console.log(`🔌 Nuevo cliente en empresa: ${empresaId}`);
+
     socket.on('nuevo-pedido', async (data) => {
         const viaje = new Viaje({ ...data, empresaId, socketIdCliente: socket.id });
         await viaje.save();
         io.to(empresaId).emit('notificar-operador', viaje);
     });
+
+    socket.on('confirmar-viaje', async (data) => {
+        const v = await Viaje.findByIdAndUpdate(data.viajeId, { 
+            chofer: data.chofer, 
+            tiempoEstimado: data.tiempoEstimado, 
+            estado: 'confirmado' 
+        }, { new: true });
+        if (v) io.to(v.socketIdCliente).emit('confirmacion-cliente', v);
+    });
 });
 
-// --- ENCENDIDO LOCAL ---
-const PORT = process.env.PORT || 3000;
-httpServer.listen(PORT, () => {
-    console.log(`\n🚀 SERVIDOR ACTIVO EN http://localhost:${PORT}`);
-    console.log(`📡 PRUEBA API: http://localhost:${PORT}/api/config/default\n`);
+// --- RUTAS API ---
+
+// Configuración de Marca Blanca
+app.get('/api/config/:slug', async (req, res) => {
+    try {
+        let empresa = await Empresa.findOne({ slug: req.params.slug });
+        if (!empresa) empresa = await Empresa.findOne({ slug: 'default' });
+        res.json(empresa);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
-module.exports = app;
+// SuperAdmin: Listar empresas
+app.get('/api/superadmin/empresas', async (req, res) => {
+    const empresas = await Empresa.find().sort({ fechaRegistro: -1 });
+    res.json(empresas);
+});
+
+// Mercado Pago: Generar Link
+app.post('/api/pagos/crear-link', async (req, res) => {
+    const { viajeId, monto, empresaId } = req.body;
+    try {
+        const empresa = await Empresa.findById(empresaId);
+        if (!empresa?.config?.mpToken) return res.status(400).send("Token MP faltante");
+
+        const client = new MercadoPagoConfig({ accessToken: empresa.config.mpToken });
+        const preference = new Preference(client);
+        
+        const result = await preference.create({
+            body: {
+                items: [{ title: `Viaje Taxichat`, quantity: 1, unit_price: Number(monto), currency_id: 'ARS' }],
+                back_urls: { success: `https://${req.headers.host}/pago-exitoso.html` },
+                auto_return: "approved",
+            }
+        });
+
+        const viaje = await Viaje.findById(viajeId);
+        if (viaje) {
+            io.to(viaje.socketIdCliente).emit('recibir-pago', { link: result.init_point, monto });
+        }
+        res.json({ link: result.init_point });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// --- MANEJO DE ENCENDIDO (Local vs Vercel) ---
+if (process.env.NODE_ENV !== 'production') {
+    const PORT = 3000;
+    httpServer.listen(PORT, () => {
+        console.log(`🚀 Servidor local en http://localhost:${PORT}`);
+    });
+}
+
+// Exportación para Vercel
+module.exports = (req, res) => {
+    if (!res.socket.server.io) {
+        res.socket.server.io = io;
+        io.attach(res.socket.server);
+    }
+    app(req, res);
+};
