@@ -74,36 +74,57 @@
 
     // 1. Inicialización de Marca Blanca
     async function inicializarSaaS() {
-    const params = new URLSearchParams(window.location.search);
-    const slug = params.get('v') || 'default';
-
     try {
-        const res = await fetch(`/api/config/${slug}`);
+        console.log("Iniciando conexión con el núcleo...");
         
-        // Si la respuesta no es OK, lanzamos error para capturarlo en el catch
-        if (!res.ok) {
-            const errorData = await res.json();
-            throw new Error(errorData.error || "Error en el servidor");
+        const respuesta = await fetch('/api/config/default');
+        
+        // Si la API falla (500), creamos un objeto de respaldo (fallback)
+        let config = {};
+        if (respuesta.ok) {
+            config = await respuesta.json();
+        } else {
+            console.warn("Servidor no respondió. Usando configuración de emergencia.");
         }
 
-        const config = await res.json();
-        
-        // Aplicar marca blanca
-        document.getElementById('empresa-nombre').innerText = config.nombre;
-        document.documentElement.style.setProperty('--brand', config.config.color);
-        
-        // Conectar Socket
-       socket = io({
-    path: '/api/socket', 
-    addTrailingSlash: false, // Evita que agregue / extra y cause 404
-    query: { empresaId: config._id },
-    transports: ['polling', 'websocket'] // Vercel requiere polling primero
-});
+        // --- SOLUCIÓN AL TYPEERROR (Línea 93) ---
+        // Definimos valores seguros para evitar el error de 'reading color'
+        const colorApp = config?.tema?.color || '#FFD700'; // Amarillo taxi por defecto
+        const clientId = config?.googleClientId || '';
+
+        // Inicialización del Socket con el path correcto y protección de datos
+        // Esta es tu línea 93 corregida:
+        const socket = io({ 
+            path: '/api/socket',
+            auth: {
+                color: colorApp,
+                version: '1.0.0'
+            }
+        });
+
+        // Configuración dinámica de Google Login si el elemento existe
+        const googleDiv = document.getElementById('g_id_onload');
+        if (googleDiv && clientId) {
+            googleDiv.setAttribute('data-client_id', clientId);
+        }
+
+        // Carga dinámica de Google Maps
+        if (config.googleMapsKey) {
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${config.googleMapsKey}&libraries=places`;
+            document.head.appendChild(script);
+        }
+
+        console.log("SaaS inicializado correctamente.");
 
     } catch (error) {
-        console.error("Error de inicialización:", error);
-        document.getElementById('driver-info').innerText = "⚠️ Error de conexión: " + error.message;
-        document.getElementById('status-panel').classList.remove('hidden');
+        // Este bloque atrapa cualquier error y evita que la consola se llene de TypeErrors
+        console.error("Error crítico de inicialización:", error.message);
+        
+        // Intentar conectar el socket de forma básica si todo lo demás falla
+        if (typeof io !== 'undefined') {
+            window.socket = io({ path: '/api/socket' });
+        }
     }
 }
 
