@@ -2,68 +2,211 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>taxichat - Panel de Operaciones</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>taxichat - Operaciones e Historial</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
     <style>
-        body { font-family: sans-serif; background: #1e1e2f; color: white; padding: 20px; }
-        .container { max-width: 800px; margin: auto; }
-        .pedido-card { background: #27293d; padding: 20px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #3d3f51; display: flex; justify-content: space-between; align-items: center; }
-        .btn-accept { background: #00f2c3; color: #1e1e2f; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        .badge { background: #e14eca; padding: 4px 8px; border-radius: 4px; font-size: 0.8em; }
+        :root { --accent: #10b981; }
+        .text-accent { color: var(--accent); }
+        .bg-accent { background-color: var(--accent); }
+        /* Scrollbar personalizada para el panel oscuro */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e1e2f; }
+        ::-webkit-scrollbar-thumb { background: #3d3f51; border-radius: 10px; }
     </style>
 </head>
-<body>
+<body class="bg-[#1e1e2f] text-gray-100 min-h-screen font-sans">
 
-<div class="container">
-    <h1>Pedidos en Tiempo Real <span id="nombre-marca" style="color: #e14eca;"></span></h1>
-    <div id="lista-pedidos">
-        <p>Esperando nuevos pedidos...</p>
-    </div>
-</div>
-
-<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
-<script>
-    let socket;
-
-    async function inicializarOperador() {
-        const params = new URLSearchParams(window.location.search);
-        const slug = params.get('v'); // Ejemplo: operator.html?v=taxi-mendoza
-
-        const res = await fetch(`/api/config/${slug}`);
-        const config = await res.json();
-        
-        document.getElementById('nombre-marca').innerText = `| ${config.nombre}`;
-
-        socket = io({ query: { empresaId: config._id } });
-
-        socket.on('notificar-operador', (pedido) => {
-            const container = document.getElementById('lista-pedidos');
-            if(container.querySelector('p')) container.innerHTML = ""; // Limpiar mensaje inicial
-
-            const div = document.createElement('div');
-            div.className = 'pedido-card';
-            div.innerHTML = `
+    <nav class="bg-[#27293d] border-b border-gray-700 p-4 sticky top-0 z-50 shadow-lg">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-4">
+                <img id="op-logo" src="" class="h-10 w-10 object-contain hidden rounded-lg bg-white p-1">
                 <div>
-                    <strong>👤 ${pedido.usuario}</strong><br>
-                    <small>📍 Destino: ${pedido.destino}</small>
+                    <h1 id="op-titulo" class="text-xl font-black tracking-tighter uppercase leading-none">Cargando...</h1>
+                    <span class="text-[10px] text-gray-400 font-bold tracking-widest">OPERATOR PANEL</span>
                 </div>
-                <button class="btn-accept" onclick="confirmar('${pedido._id}', '${pedido.socketIdCliente}')">ASIGNAR CHOFER</button>
-            `;
-            container.prepend(div);
-        });
-    }
+            </div>
+            <div class="flex items-center space-x-4">
+                <button onclick="descargarCSV()" class="hidden md:flex items-center space-x-2 bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg text-sm font-bold transition">
+                    <span>📥 Exportar CSV</span>
+                </button>
+                <div class="flex items-center space-x-2 bg-[#1e1e2f] px-3 py-1.5 rounded-full border border-gray-700">
+                    <span class="relative flex h-2 w-2">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </span>
+                    <span class="text-[10px] font-bold text-gray-300">LIVE</span>
+                </div>
+            </div>
+        </div>
+    </nav>
 
-    function confirmar(viajeId, clienteId) {
-        const chofer = prompt("Nombre del chofer:");
-        if(!chofer) return;
+    <main class="max-w-7xl mx-auto p-6 space-y-10">
+        
+        <section>
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold flex items-center">
+                    <span class="bg-accent w-2 h-8 rounded-full mr-3"></span>
+                    Pedidos Entrantes
+                </h2>
+                <span id="counter-pedidos" class="bg-gray-800 text-accent text-xs font-black px-3 py-1 rounded-full border border-accent">0 NUEVOS</span>
+            </div>
+            
+            <div id="lista-pedidos" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div id="no-pedidos" class="col-span-full py-12 text-center border-2 border-dashed border-gray-700 rounded-3xl">
+                    <p class="text-gray-500 font-medium">Esperando solicitudes de pasajeros...</p>
+                </div>
+            </div>
+        </section>
 
-        socket.emit('confirmar-viaje', {
-            viajeId: viajeId,
-            chofer: chofer
-        });
-        alert("Viaje confirmado");
-    }
+        <section class="bg-[#27293d] rounded-3xl shadow-2xl overflow-hidden border border-gray-700">
+            <div class="p-6 border-b border-gray-700 flex justify-between items-center bg-[#2d2f44]">
+                <h2 class="text-xl font-bold">Historial Reciente</h2>
+                <button onclick="cargarHistorial()" class="text-xs text-accent hover:underline font-bold">🔄 Actualizar</button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="text-gray-400 text-[11px] uppercase tracking-widest bg-[#1e1e2f]">
+                            <th class="px-6 py-4">Fecha/Hora</th>
+                            <th class="px-6 py-4">Pasajero</th>
+                            <th class="px-6 py-4">Destino</th>
+                            <th class="px-6 py-4">Chofer</th>
+                            <th class="px-6 py-4 text-center">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-historial" class="divide-y divide-gray-700">
+                        </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
 
-    inicializarOperador();
-</script>
+    <script>
+        let socket;
+        let empresaId = null;
+        let viajesLocales = [];
+
+        async function inicializar() {
+            const params = new URLSearchParams(window.location.search);
+            const slug = params.get('v');
+            if (!slug) return alert("Acceso denegado.");
+
+            try {
+                const res = await fetch(`/api/config/${slug}`);
+                const config = await res.json();
+                empresaId = config._id;
+
+                // UI Marca Blanca
+                document.getElementById('op-titulo').innerText = config.nombre;
+                document.documentElement.style.setProperty('--accent', config.config.color || '#10b981');
+                if (config.logo) {
+                    const img = document.getElementById('op-logo');
+                    img.src = config.logo;
+                    img.style.display = 'block';
+                }
+
+                // Sockets
+                socket = io({
+                    path: '/api/socket',
+                    query: { empresaId: config._id },
+                    transports: ['polling', 'websocket']
+                });
+
+                escucharEventos();
+                cargarHistorial();
+
+            } catch (e) { console.error("Error:", e); }
+        }
+
+        function escucharEventos() {
+            socket.on('notificar-operador', (pedido) => {
+                document.getElementById('no-pedidos').classList.add('hidden');
+                const container = document.getElementById('lista-pedidos');
+                
+                const card = document.createElement('div');
+                card.className = "bg-[#2d2f44] p-5 rounded-2xl border border-gray-600 shadow-xl animate-bounce-short";
+                card.id = `card-${pedido._id}`;
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="text-accent font-black text-lg">${pedido.usuario}</span>
+                        <span class="text-[9px] bg-gray-900 px-2 py-1 rounded text-gray-400 uppercase font-bold">Nuevo Pedido</span>
+                    </div>
+                    <div class="space-y-2 mb-5">
+                        <p class="text-xs text-gray-400 uppercase font-bold">Destino:</p>
+                        <p class="text-sm text-gray-200 bg-[#1e1e2f] p-3 rounded-lg border border-gray-700">${pedido.destino}</p>
+                    </div>
+                    <button onclick="asignarChofer('${pedido._id}', '${pedido.socketIdCliente}')" 
+                            class="w-full bg-accent hover:opacity-90 text-[#1e1e2f] font-black py-3 rounded-xl transition shadow-lg">
+                        ASIGNAR CHOFER
+                    </button>
+                `;
+                container.prepend(card);
+                actualizarContador(1);
+            });
+        }
+
+        function asignarChofer(viajeId, clienteId) {
+            const chofer = prompt("Nombre del Chofer:");
+            const tiempo = prompt("Minutos para llegar:", "5");
+
+            if (!chofer || !tiempo) return;
+
+            socket.emit('confirmar-viaje', { viajeId, clienteId, chofer, tiempoEstimado: tiempo });
+            
+            // Remover de la vista de pendientes y refrescar historial
+            document.getElementById(`card-${viajeId}`).remove();
+            actualizarContador(-1);
+            setTimeout(cargarHistorial, 1000);
+        }
+
+        async function cargarHistorial() {
+            const res = await fetch(`/api/historial/${empresaId}`);
+            viajesLocales = await res.json();
+            const tabla = document.getElementById('tabla-historial');
+            tabla.innerHTML = "";
+
+            viajesLocales.forEach(v => {
+                const badgeColor = v.estado === 'confirmado' ? 'bg-green-500/10 text-green-500' : 'bg-yellow-500/10 text-yellow-500';
+                tabla.innerHTML += `
+                    <tr class="hover:bg-gray-800/50 transition">
+                        <td class="px-6 py-4 text-xs text-gray-400">${new Date(v.fecha).toLocaleString()}</td>
+                        <td class="px-6 py-4 font-bold text-sm text-gray-200">${v.usuario}</td>
+                        <td class="px-6 py-4 text-xs text-gray-400 max-w-[200px] truncate">${v.destino}</td>
+                        <td class="px-6 py-4 text-sm text-accent font-medium">${v.chofer}</td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase ${badgeColor}">
+                                ${v.estado}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function descargarCSV() {
+            if (viajesLocales.length === 0) return alert("No hay datos");
+            let csv = "Fecha,Usuario,Destino,Chofer,Estado\n";
+            viajesLocales.forEach(v => {
+                csv += `${new Date(v.fecha).toLocaleString()},${v.usuario},${v.destino},${v.chofer},${v.estado}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', 'historial_viajes.csv');
+            a.click();
+        }
+
+        let pedidosCount = 0;
+        function actualizarContador(n) {
+            pedidosCount += n;
+            if(pedidosCount < 0) pedidosCount = 0;
+            document.getElementById('counter-pedidos').innerText = `${pedidosCount} NUEVOS`;
+        }
+
+        window.onload = inicializar;
+    </script>
 </body>
 </html>

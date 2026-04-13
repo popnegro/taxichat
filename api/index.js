@@ -67,3 +67,39 @@ module.exports = (req, res) => {
     }
     app(req, res);
 };
+
+// 1. Listar todas las empresas (Para el SuperAdmin)
+app.get('/api/superadmin/empresas', async (req, res) => {
+    try {
+        const empresas = await Empresa.find().sort({ fechaRegistro: -1 });
+        res.json(empresas);
+    } catch (error) {
+        res.status(500).json({ error: "Error al listar empresas" });
+    }
+});
+
+// 2. Editar una empresa existente
+app.put('/api/superadmin/empresas/:id', async (req, res) => {
+    try {
+        const empresaActualizada = await Empresa.findByIdAndUpdate(
+            req.params.id, 
+            req.body, 
+            { new: true }
+        );
+        res.json(empresaActualizada);
+    } catch (error) {
+        res.status(500).json({ error: "Error al actualizar la empresa" });
+    }
+});
+
+// 3. Eliminar una empresa y sus viajes asociados
+app.delete('/api/superadmin/empresas/:id', async (req, res) => {
+    try {
+        const id = req.params.id;
+        await Empresa.findByIdAndDelete(id);
+        await Viaje.deleteMany({ empresaId: id }); // Limpieza de datos
+        res.json({ message: "Empresa y datos eliminados correctamente" });
+    } catch (error) {
+        res.status(500).json({ error: "Error al eliminar" });
+    }
+});
