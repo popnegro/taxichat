@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <title>TaxiChat - Cliente</title>
     <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
+
 <body>
     <div id="app">Cargando sistema...</div>
 
@@ -21,17 +23,31 @@
 
                 // 1. Evitar error de color (Línea 93 protegida)
                 const colorApp = config?.tema?.color || '#FFD700';
-                
+
                 // 2. Inicializar Socket con path corregido
-                socket = io({ 
+                socket = io({
                     path: '/api/socket',
                     addTrailingSlash: false,
+                    // Priorizamos polling que es lo que Vercel acepta mejor de entrada
                     transports: ['polling', 'websocket'],
-                    auth: { color: colorApp }
+                    upgrade: true,
+                    rememberUpgrade: true,
+                    timeout: 20000 // Le damos un poco más de tiempo para el apretón de manos
                 });
 
-                socket.on('connect', () => console.log("✅ Socket conectado"));
+                socket.on('connect', () => {
+                    console.log("✅ Conectado con ID:", socket.id);
 
+                    // Enviamos un mensaje de prueba
+                    socket.emit('nuevo-viaje', {
+                        pasajero: "Prueba Sistema",
+                        destino: "Mendoza Centro"
+                    });
+                });
+
+                socket.on('viaje-recibido', (data) => {
+                    console.log("🚀 ¡Mensaje recibido desde el servidor!", data);
+                });
                 // 3. Cargar Maps dinámicamente
                 if (config.googleMapsKey) {
                     const script = document.createElement('script');
@@ -49,4 +65,5 @@
         window.onload = inicializarSaaS;
     </script>
 </body>
+
 </html>
