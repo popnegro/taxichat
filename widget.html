@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taxi Widget - Cliente</title>
+    <style>
+        :root { --primary: #000; --accent: #009ee3; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; justify-content: center; padding: 20px; }
+        .widget { background: white; width: 100%; max-width: 400px; padding: 25px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        h2 { margin-top: 0; font-size: 1.5em; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+        button { width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; transition: 0.3s; }
+        button:hover { opacity: 0.8; }
+        .status-panel { margin-top: 20px; padding: 15px; background: #f8f9fa; border-left: 5px solid var(--accent); display: none; border-radius: 4px; }
+        #payment-area a { display: block; background: var(--accent); color: white; text-align: center; padding: 12px; text-decoration: none; border-radius: 8px; margin-top: 15px; font-weight: bold; }
+        .price-tag { color: #2ecc71; font-weight: bold; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+
+<div class="widget">
+    <h2>Pedir un Taxi</h2>
+    <input type="text" id="userName" placeholder="Tu Nombre Completo">
+    <input type="text" id="origin" placeholder="Origen (Detectando ubicación...)" readonly style="background: #f9f9f9;">
+    <input type="text" id="destination" placeholder="¿A dónde vamos?">
+    
+    <div id="estimate-box" style="margin: 10px 0; font-size: 0.9em; color: #666;"></div>
+    
+    <button id="btnRequest" onclick="solicitarTaxi()">SOLICITAR TAXI</button>
+
+    <div id="status-panel" class="status-panel">
+        <strong>Estado de tu viaje:</strong>
+        <p id="driver-info">Buscando el chofer más cercano...</p>
+        <div id="payment-area"></div>
+    </div>
+</div>
+
+<script src="http://localhost:3000/socket.io/socket.io.js"></script>
+<script>
+    // Configuración de servidor (Local vs Producción)
+    const SERVER_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:3000'
+        : 'https://smartweb-9oclc0pwc-popnegros-projects.vercel.app/'; // Cambiar por tu URL real
+
+    const socket = io(SERVER_URL);
+    let autocomplete;
+
+    // Ejecutar cuando el HTML esté cargado
+    document.addEventListener('DOMContentLoaded', () => {
+        const nameInput = document.getElementById('userName');
+        if (nameInput) {
+            nameInput.value = localStorage.getItem('userTaxiName') || '';
+            nameInput.addEventListener('input', () => {
+                localStorage.setItem('userTaxiName', nameInput.value);
+            });
+        }
+    });
+
+    function initMaps() {
+        const destInput = document.getElementById('destination');
+        if (!destInput) return;
+
+        autocomplete = new google.maps.places.Autocomplete(destInput);
+        
+        autocomplete.addListener('place_changed', () => {
+            const place = autocomplete.getPlace();
+            if (!place.geometry) return;
+            
+            // Simulación de tarifa basada en distancia aleatoria
+            const dist = (Math.random() * 8 + 2).toFixed(1);
+            const price = (dist * 150 + 400).toFixed(0);
+            document.getElementById('estimate-box').innerHTML = 
+                `Distancia: ${dist}km | <span class="price-tag">Est: $${price}</span>`;
+        });
+
+        // Autodetectar ubicación para el campo origen
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(p => {
+                const originInput = document.getElementById('origin');
+                if (originInput) {
+                    originInput.value = `Ubicación actual (${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)})`;
+                }
+            });
+        }
+    }
+
+    function solicitarTaxi() {
+        const user = document.getElementById('userName').value;
+        const dest = document.getElementById('destination').value;
+        
+        if (!user || !dest) {
+            return alert("Por favor, ingresa tu nombre y destino");
+        }
+
+        document.getElementById('status-panel').style.display = 'block';
+        document.getElementById('btnRequest').disabled = true;
+        document.getElementById('btnRequest').innerText = "ESPERANDO CHOFER...";
+        
+        // Enviar evento al servidor
+        socket.emit('nuevo-pedido', { 
+            usuario: user, 
+            destino: dest,
+            timestamp: new Date().getTime()
+        });
+    }
+
+    // Escuchar confirmación del Dashboard
+    socket.on('confirmacion-cliente', (data) => {
+        document.getElementById('driver-info').innerHTML = 
+            `✅ <b>${data.chofer}</b> está en camino.<br>Llega en aproximadamente <b>${data.tiempo} min</b>.`;
+    });
+
+    // Escuchar link de pago de Mercado Pago
+    socket.on('recibir-pago', (data) => {
+        document.getElementById('payment-area').innerHTML = `
+            <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
+            <p>Paga tu viaje de forma segura:</p>
+            <a href="${data.link}" target="_blank">PAGAR $${data.monto}</a>
+        `;
+    });
+</script>
+
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAmTzHBhtQ4E8BG6DL0xdrEOYdZmQEBXkI&libraries=places&callback=initMaps"></script>
+
+</body>
+</html>
