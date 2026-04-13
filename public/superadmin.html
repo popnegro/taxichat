@@ -2,190 +2,54 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>taxichat | SuperAdmin Panel</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <title>TaxiChat - SuperAdmin</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        body { font-family: sans-serif; background: #1a202c; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .admin-box { background: #2d3748; padding: 40px; border-radius: 15px; border: 2px solid #ed8936; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
+        h1 { color: #ed8936; font-size: 24px; }
+        .status { margin-top: 20px; font-size: 11px; color: #a0aec0; }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen">
+<body>
 
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-            <div class="flex items-center space-x-2">
-                <div class="bg-blue-600 text-white p-1.5 rounded-lg">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                </div>
-                <h1 class="text-xl font-extrabold text-slate-800 tracking-tight">taxichat<span class="text-blue-600">.</span>admin</h1>
-            </div>
-            <div class="text-sm font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
-                Control Global SaaS
-            </div>
-        </div>
-    </header>
-
-    <main class="max-w-7xl mx-auto p-6 lg:p-10">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
-            
-            <div class="lg:col-span-4">
-                <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-8 sticky top-28">
-                    <h2 class="text-lg font-bold text-slate-800 mb-6">Dar de Alta Empresa</h2>
-                    <form id="formEmpresa" class="space-y-4">
-                        <div>
-                            <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Nombre Comercial</label>
-                            <input type="text" id="nombre" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="Ej: Radio Taxi Mendoza">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Slug (URL única)</label>
-                            <input type="text" id="slug" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="ej: taxi-mendoza">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold uppercase text-slate-400 mb-1">URL del Logo</label>
-                            <input type="url" id="logo" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="https://dominio.com/logo.png">
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Color Marca</label>
-                                <input type="color" id="color" value="#2563eb" class="w-full h-12 rounded-xl border border-slate-200 p-1 cursor-pointer">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Símbolo</label>
-                                <div class="flex items-center justify-center h-12 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-                                    <span id="colorPreview" class="w-4 h-4 rounded-full bg-blue-600"></span>
-                                </div>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Mercado Pago Token</label>
-                            <input type="password" id="mpToken" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="APP_USR-xxxx...">
-                        </div>
-                        <button type="submit" class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-black transition-all shadow-lg hover:shadow-xl active:scale-[0.98]">
-                            CREAR MARCA BLANCA
-                        </button>
-                    </form>
-                </div>
-            </div>
-
-            <div class="lg:col-span-8">
-                <div class="flex items-center justify-between mb-6">
-                    <h3 class="text-xl font-bold text-slate-800">Clientes SaaS Activos</h3>
-                    <span id="totalEmpresas" class="bg-blue-100 text-blue-600 text-xs font-bold px-3 py-1 rounded-full">0 Marcas</span>
-                </div>
-
-                <div id="lista-empresas" class="grid gap-4">
-                    <div class="bg-white p-10 rounded-3xl border border-dashed border-slate-300 text-center">
-                        <p class="text-slate-400">No hay empresas registradas aún.</p>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-    </main>
+    <div class="admin-box">
+        <h1>Control Maestro</h1>
+        <p>Solo personal autorizado</p>
+        
+        <div id="g_id_onload" data-context="signin" data-ux_mode="popup" data-callback="verifyAdmin" data-auto_prompt="false"></div>
+        <div class="g_id_signin" data-type="standard" data-theme="filled_black" data-size="large"></div>
+        
+        <div class="status" id="sys-msg">Conectando con el núcleo...</div>
+    </div>
 
     <script>
-        const API_URL = '/api';
-
-        // Actualizar preview de color
-        document.getElementById('color').addEventListener('input', (e) => {
-            document.getElementById('colorPreview').style.backgroundColor = e.target.value;
-        });
-
-        // Registrar Empresa
-        document.getElementById('formEmpresa').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const btn = e.target.querySelector('button');
-            btn.disabled = true;
-            btn.innerText = "Registrando...";
-
-            const data = {
-                nombre: document.getElementById('nombre').value,
-                slug: document.getElementById('slug').value,
-                logo: document.getElementById('logo').value,
-                config: {
-                    color: document.getElementById('color').value,
-                    mpToken: document.getElementById('mpToken').value
-                }
-            };
-
-            try {
-                const res = await fetch(`${API_URL}/empresas`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-
-                if (res.ok) {
-                    alert("¡Empresa creada con éxito!");
-                    e.target.reset();
-                    listarEmpresas();
-                }
-            } catch (err) {
-                alert("Error al conectar con el servidor");
-            } finally {
-                btn.disabled = false;
-                btn.innerText = "CREAR MARCA BLANCA";
-            }
-        });
-
-        // Listar Empresas
-        async function listarEmpresas() {
-            try {
-                const res = await fetch(`${API_URL}/superadmin/empresas`);
-                const empresas = await res.json();
-                const contenedor = document.getElementById('lista-empresas');
-                document.getElementById('totalEmpresas').innerText = `${empresas.length} Marcas`;
-
-                if (empresas.length === 0) return;
-
-                contenedor.innerHTML = "";
-                empresas.forEach(emp => {
-                    contenedor.innerHTML += `
-                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:shadow-md transition-shadow">
-                            <div class="flex items-center space-x-4">
-                                <div class="w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center border border-slate-100 bg-slate-50 overflow-hidden">
-                                    ${emp.logo ? `<img src="${emp.logo}" class="w-full h-full object-contain">` : `<span class="text-xl font-bold" style="color: ${emp.config.color}">${emp.nombre[0]}</span>`}
-                                </div>
-                                <div>
-                                    <h4 class="font-bold text-slate-800">${emp.nombre}</h4>
-                                    <p class="text-xs text-slate-400 font-mono tracking-tighter">slug: ${emp.slug}</p>
-                                </div>
-                            </div>
-                            
-                            <div class="flex items-center gap-2">
-                                <button onclick="copiarLink('client', '${emp.slug}')" class="flex-1 md:flex-none px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 transition">CLIENTE</button>
-                                <button onclick="copiarLink('operator', '${emp.slug}')" class="flex-1 md:flex-none px-4 py-2 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold hover:bg-emerald-100 transition">OPERADOR</button>
-                                <button onclick="eliminarEmpresa('${emp._id}')" class="p-2 text-slate-300 hover:text-red-500 transition">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                });
-            } catch (err) {
-                console.error("Error al listar:", err);
+        async function loadConfig() {
+            const res = await fetch('/api/config/default');
+            const config = await res.json();
+            if (config.googleClientId) {
+                document.getElementById('g_id_onload').setAttribute('data-client_id', config.googleClientId);
+                document.getElementById('sys-msg').innerText = "Sistema listo para autenticación.";
             }
         }
 
-        function copiarLink(tipo, slug) {
-            const domain = window.location.origin;
-            const url = `${domain}/${tipo}.html?v=${slug}`;
-            navigator.clipboard.writeText(url);
-            alert(`Link de ${tipo} copiado.`);
+        async function verifyAdmin(response) {
+            const res = await fetch('/api/auth/google', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: response.credential, role: 'admin' })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                sessionStorage.setItem('admin_access', 'true');
+                window.location.href = '/admin/dashboard.html';
+            } else {
+                alert("ERROR: Credenciales sin privilegios de SuperAdmin.");
+            }
         }
 
-        async function eliminarEmpresa(id) {
-            if (!confirm("¿Deseas eliminar esta marca? Se perderá toda su configuración y viajes.")) return;
-            await fetch(`${API_URL}/superadmin/empresas/${id}`, { method: 'DELETE' });
-            listarEmpresas();
-        }
-
-        window.onload = listarEmpresas;
+        window.onload = loadConfig;
     </script>
 </body>
 </html>
