@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>taxichat - Pedir Viaje</title>
+    <style>
+        :root { --primary-color: #000; } /* Se actualizará dinámicamente */
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; justify-content: center; padding: 20px; }
+        .widget { background: white; width: 100%; max-width: 400px; padding: 25px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .header { text-align: center; margin-bottom: 20px; }
+        .logo { max-width: 80px; margin-bottom: 10px; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        button { width: 100%; padding: 15px; background: var(--primary-color); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .status-panel { margin-top: 20px; padding: 15px; background: #f8f9fa; border-left: 5px solid var(--primary-color); display: none; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="widget">
+    <div class="header">
+        <img id="logo-img" src="" alt="Logo" class="logo" style="display:none;">
+        <h2 id="empresa-nombre">Cargando...</h2>
+    </div>
+    
+    <input type="text" id="userName" placeholder="Tu Nombre">
+    <input type="text" id="destination" placeholder="¿A dónde vas?">
+    <button id="btnRequest" onclick="solicitarTaxi()">SOLICITAR TAXI</button>
+
+    <div id="status-panel" class="status-panel">
+        <strong>Estado:</strong>
+        <p id="driver-info">Buscando chofer...</p>
+    </div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+<script>
+    let socket;
+    let empresaConfig = null;
+
+    async function inicializar() {
+        const params = new URLSearchParams(window.location.search);
+        const slug = params.get('v'); // Ejemplo: client.html?v=taxi-mendoza
+
+        if (!slug) return alert("Error: No se especificó empresa");
+
+        try {
+            const res = await fetch(`/api/config/${slug}`);
+            empresaConfig = await res.json();
+
+            // Aplicar Marca Blanca
+            document.getElementById('empresa-nombre').innerText = empresaConfig.nombre;
+            document.documentElement.style.setProperty('--primary-color', empresaConfig.config.color);
+            if(empresaConfig.logo) {
+                const img = document.getElementById('logo-img');
+                img.src = empresaConfig.logo;
+                img.style.display = 'inline-block';
+            }
+
+            // Conectar Socket pasando el empresaId
+            socket = io({ query: { empresaId: empresaConfig._id } });
+
+            socket.on('confirmacion-cliente', (data) => {
+                document.getElementById('driver-info').innerHTML = 
+                    `✅ <b>${data.chofer}</b> confirmado.`;
+            });
+
+        } catch (e) { console.error("Error inicializando:", e); }
+    }
+
+    function solicitarTaxi() {
+        const usuario = document.getElementById('userName').value;
+        const destino = document.getElementById('destination').value;
+        
+        socket.emit('nuevo-pedido', { usuario, destino });
+        
+        document.getElementById('status-panel').style.display = 'block';
+        document.getElementById('btnRequest').disabled = true;
+        document.getElementById('btnRequest').innerText = "ENVIADO";
+    }
+
+    inicializar();
+</script>
+</body>
+</html>

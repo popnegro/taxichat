@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<body style="font-family: sans-serif; padding: 20px;">
+    <h2>Registrar Nueva Marca Blanca</h2>
+    <input id="n" placeholder="Nombre Empresa"><br>
+    <input id="s" placeholder="Slug (ej: mendoza-taxi)"><br>
+    <input id="t" placeholder="MP Token"><br>
+    <button onclick="crear()">CREAR EMPRESA</button>
+
+    <script>
+        async function crear() {
+            await fetch('/api/empresas', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    nombre: document.getElementById('n').value,
+                    slug: document.getElementById('s').value,
+                    config: { mpToken: document.getElementById('t').value }
+                })
+            });
+            alert("Empresa Creada");
+        }
+    </script>
+</body>
+</html>

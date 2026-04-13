@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>taxichat - Panel de Operaciones</title>
+    <style>
+        body { font-family: sans-serif; background: #1e1e2f; color: white; padding: 20px; }
+        .container { max-width: 800px; margin: auto; }
+        .pedido-card { background: #27293d; padding: 20px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #3d3f51; display: flex; justify-content: space-between; align-items: center; }
+        .btn-accept { background: #00f2c3; color: #1e1e2f; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .badge { background: #e14eca; padding: 4px 8px; border-radius: 4px; font-size: 0.8em; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Pedidos en Tiempo Real <span id="nombre-marca" style="color: #e14eca;"></span></h1>
+    <div id="lista-pedidos">
+        <p>Esperando nuevos pedidos...</p>
+    </div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+<script>
+    let socket;
+
+    async function inicializarOperador() {
+        const params = new URLSearchParams(window.location.search);
+        const slug = params.get('v'); // Ejemplo: operator.html?v=taxi-mendoza
+
+        const res = await fetch(`/api/config/${slug}`);
+        const config = await res.json();
+        
+        document.getElementById('nombre-marca').innerText = `| ${config.nombre}`;
+
+        socket = io({ query: { empresaId: config._id } });
+
+        socket.on('notificar-operador', (pedido) => {
+            const container = document.getElementById('lista-pedidos');
+            if(container.querySelector('p')) container.innerHTML = ""; // Limpiar mensaje inicial
+
+            const div = document.createElement('div');
+            div.className = 'pedido-card';
+            div.innerHTML = `
+                <div>
+                    <strong>👤 ${pedido.usuario}</strong><br>
+                    <small>📍 Destino: ${pedido.destino}</small>
+                </div>
+                <button class="btn-accept" onclick="confirmar('${pedido._id}', '${pedido.socketIdCliente}')">ASIGNAR CHOFER</button>
+            `;
+            container.prepend(div);
+        });
+    }
+
+    function confirmar(viajeId, clienteId) {
+        const chofer = prompt("Nombre del chofer:");
+        if(!chofer) return;
+
+        socket.emit('confirmar-viaje', {
+            viajeId: viajeId,
+            chofer: chofer
+        });
+        alert("Viaje confirmado");
+    }
+
+    inicializarOperador();
+</script>
+</body>
+</html>
