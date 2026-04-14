@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Operador - TaxiChat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+
+        /* Skeleton Styles */
+        .skeleton { background-color: #e2e8f0; position: relative; overflow: hidden; }
+        .skeleton::after {
+            content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0;
+            transform: translateX(-100%);
+            background-image: linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,0.2) 20%, rgba(255,255,255,0.5) 60%, rgba(255,255,255,0));
+            animation: shimmer 2s infinite;
+        }
+        @keyframes shimmer { 100% { transform: translateX(100%); } }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Contenedor de Notificaciones (Toasts) -->
+    <div id="toast-container" class="fixed top-5 left-1/2 -translate-x-1/2 z-[100] space-y-2 w-full max-w-xs pointer-events-none"></div>
+
+    <!-- Navbar Dinámico (Marca Blanca) -->
+    <nav id="navbar" class="bg-slate- flex justify-between items-center">
+            <h1 id="brand-name" class="text-xl font-bold text-white uppercase tracking-tight opacity-0">TaxiChat Admin</h1>
+            <div class="flex items-center space-x-4"> 
+                    <input type="password" id="operador-token" placeholder="Token de Seguridad" class="text-black text-sm px-4 py-2 rounded-xl border-none outline-none focus:ring-2 focus:ring-yellow-400">
+                </div>
+                <span id="status-dot" class="h-3 w-3 bg-red-500 rounded-full border-2 border-white shadow-sm" title="Desconectado"></span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto p-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Columna de Pedidos Entrantes -->
+            <div class="lg:col-span-2 space-y-4">
+                <h2 class="text-2xl font-bold text-slate-700 flex items-center">
+                    <span class="mr-2">🚕</span> Viajes en Espera
+                </h2>
+                <div id="trips-container" class="space-y-4">
+                    <p id="no-trips" class="text-gray-500 italic p-8 bg-white rounded-2xl border-2 border-dashed text-center">
+                        Monitoreando pedidos en tiempo real...
+                    </p>
+                </div>
+            </div>
+
+            <!-- Columna de Estado -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 h-fit sticky top-6">
+                <h3 class="font-bold text-lg mb-4 text-slate-800">Estado de la Terminal</h3>
+                <div class="space-y-4 text-sm">
+                    <div class="p-3 bg-blue-50 rounded-xl">
+                        <p class="text-gray-500 text-xs font-bold uppercase">Empresa Activa</p>
+                        <p id="info-slug" class="font-mono font-bold text-blue-700 text-lg skeleton rounded w-20 h-6"></p>
+                    </div>
+                        <span class="text-gray-600">Señal de Red:</span>
+                        <span class="px-2 py-1 rounded-full bg-green-100 text-green-700 font-bold text-[10px] uppercase">Excelente</span>
+                    </div>
+                    <hr class="border-gray-100">
+                    <p class="text-xs text-gray-400 leading-relaxed italic">
+                        Tip: Los pedidos aparecen automáticamente. Para confirmar, completa los datos del chofer y presiona "Despachar".
+                    </p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Template para la tarjeta de viaje -->
+    <template id="trip-card-template">
+        <div class="trip-card bg-white p-6 rounded-3xl shadow-sm border-l-[12px] border-yellow-400 flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0 transition-all hover:shadow-xl">
+            <div class="flex-1">
+                <div class="flex items-center space-x-2 mb-3">
+                    <span class="bg-yellow-100 text-yellow-800 text-[10px] font-black px-2 py-1 rounded-md uppercase">Nuevo Pedido</span>
+                    <span class="text-gray-400 text-xs trip-date font-medium"></span>
+                </div>
+                <h3 class="font-extrabold text-xl trip-user text-slate-800 tracking-tight"></h3>
+                <div class="mt-3 space-y-2">
+                    <p class="text-sm text-gray-500 flex items-start italic"><span class="mr-2">📍</span> <span class="trip-origin font-semibold text-slate-700"></span></p>
+                    <p class="text-sm text-gray-500 flex items-start italic"><span class="mr-2">🏁</span> <span class="trip-destination font-semibold text-slate-700"></span></p>
+                </div>
+                <p class="text-blue-600 font-black mt-4 text-2xl trip-price tracking-tighter"></p>
+            </div>
+            
+            <div class="w-full md:w-80 bg-slate-50 p-5 rounded-2xl space-y-4 border border-slate-100">
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Chofer y Vehículo</label>
+                    <input type="text" placeholder="Ej: Mario - Fiat Cronos" class="driver-input w-full mt-1 p-3 text-sm border-2 border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-all">
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tiempo Estimado</label>
+                    <input type="text" placeholder="Ej: 5 a 10 min" class="time-input w-full mt-1 p-3 text-sm border-2 border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-all">
+                </div>
+                <button class="confirm-btn w-full bg-slate-800 text-white font-black py-4 rounded-xl hover:bg-slate-900 transition-all shadow-lg active:scale-95 text-xs uppercase tracking-widest">DESPACHAR MÓVIL</button>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        // Configuración del sonido de notificación (puedes cambiar la URL por un archivo local)
+        const notificationSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
+
+        // Función para mostrar notificaciones personalizadas
+        function showToast(message, type = 'error') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const colors = {
+                error: 'bg-red-600',
+                success: 'bg-green-600',
+                info: 'bg-blue-600'
+            };
+            toast.className = `${colors[type]} text-white px-6 py-3 rounded-2xl shadow-2xl transform transition-all duration-300 -translate-y-4 opacity-0 flex items-center justify-between pointer-events-auto`;
+            toast.innerHTML = `<span class="text-sm font-bold">${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.remove('-translate-y-4', 'opacity-0'), 10);
+            setTimeout(() => {
+                toast.classList.add('-translate-y-4', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        let supabaseClient;
+        const slug = new URLSearchParams(window.location.search).get('slug') || 'default';
+
+        async function init() {
+            try {
+                const res = await fetch(`/api/config/${slug}`);
+                const data = await res.json();
+                
+                document.getElementById('brand-name').innerText = `Terminal - ${data.nombre}`;
+                document.getElementById('navbar').style.backgroundColor = data.config.color;
+                document.getElementById('info-slug').innerText = slug.toUpperCase();
+
+                // Remover skeletons
+                document.querySelectorAll('.skeleton').forEach(el => el.classList.remove('skeleton', 'bg-slate-200', 'w-20', 'h-6'));
+                document.getElementById('brand-name').classList.remove('opacity-0');
+
+                supabaseClient = supabase.createClient(data.publicKeys.supabaseUrl, data.publicKeys.supabaseAnonKey);
+                setupRealtime();
+            } catch (e) { console.error("Error cargando dashboard:", e); }
+        }
+
+        function setupRealtime() {
+            supabaseClient.channel(`admin-${slug}`)
+                .on('broadcast', { event: 'nuevo-pedido' }, (payload) => {
+                    // Intentar reproducir el sonido
+                    notificationSound.play().catch(err => {
+                        console.warn("El sonido no pudo reproducirse automáticamente. Se requiere interacción del usuario.");
+                    });
+
+                    addTripToUI(payload.payload);
+                    document.getElementById('status-dot').classList.replace('bg-red-500', 'bg-green-500');
+                })
+                .subscribe();
+        }
+
+        function addTripToUI(viaje) {
+            document.getElementById('no-trips').classList.add('hidden');
+            const container = document.getElementById('trips-container');
+            const template = document.getElementById('trip-card-template').content.cloneNode(true);
+
+            template.querySelector('.trip-user').innerText = viaje.usuario;
+            template.querySelector('.trip-origin').innerText = viaje.origen;
+            template.querySelector('.trip-destination').innerText = viaje.destino;
+            template.querySelector('.trip-price').innerText = `$${viaje.precio.toFixed(2)}`;
+            template.querySelector('.trip-date').innerText = new Date(viaje.fecha).toLocaleTimeString();
+
+            const confirmBtn = template.querySelector('.confirm-btn');
+            const driverInput = template.querySelector('.driver-input');
+            const timeInput = template.querySelector('.time-input');
+
+            confirmBtn.onclick = () => confirmTrip(viaje._id, driverInput.value, timeInput.value, confirmBtn);
+            container.prepend(template);
+        }
+
+        async function confirmTrip(viajeId, chofer, tiempo, btn) {
+            const token = document.getElementById('operador-token').value;
+            if (!token) return showToast("Error: Debes ingresar el Token de Seguridad.");
+            if (!chofer || !tiempo) return showToast("Faltan datos del chofer o tiempo.");
+
+            btn.disabled = true;
+            btn.innerText = "CONFIRMANDO...";
+
+            try {
+                const res = await fetch('/api/confirmar-pedido', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ viajeId, chofer, tiempoEstimado: tiempo, operadorToken: token })
+                });
+
+                const result = await res.json();
+                if (result.success) {
+                    const card = btn.closest('.trip-card');
+                    card.classList.add('opacity-40', 'grayscale', 'pointer-events-none');
+                    btn.innerText = "VIAJE DESPACHADO";
+                    btn.classList.replace('bg-slate-800', 'bg-green-600');
+                    showToast("Viaje confirmado con éxito", "success");
+                } else {
+                    showToast("Error: Token de Seguridad inválido.");
+                    btn.disabled = false;
+                    btn.innerText = "REINTENTAR";
+                }
+            } catch (e) {
+                showToast("Error de conexión con el servidor.");
+                btn.disabled = false;
+            }
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>

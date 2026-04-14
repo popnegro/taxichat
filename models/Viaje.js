@@ -23,6 +23,10 @@ const ViajeSchema = new mongoose.Schema({
         type: String, 
         required: true 
     },
+    precio: {
+        type: Number,
+        required: true
+    },
     chofer: { 
         type: String, 
         default: 'Pendiente' 
@@ -33,7 +37,7 @@ const ViajeSchema = new mongoose.Schema({
     },
     estado: { 
         type: String, 
-        enum: ['buscando', 'confirmado', 'finalizado', 'cancelado'], 
+        enum: ['buscando', 'confirmado', 'pagado', 'finalizado', 'cancelado'], 
         default: 'buscando' 
     },
     fecha: { 

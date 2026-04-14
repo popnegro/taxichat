@@ -3,121 +3,129 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solicitar Viaje | SaaS Taxi</title>
+    <title>TaxiChat - Pedir Viaje</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        body { 
-            font-family: 'Plus Jakarta Sans', sans-serif; 
-            background-color: #f1f5f9; 
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .loader { border-top-color: #3498db; animation: spinner 1.5s linear infinite; }
+        .ticket-cut { background-image: radial-gradient(circle at 10px -5px, transparent 12px, white 13px); background-size: 32px 20px; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Skeleton Styles */
+        .skeleton { background-color: #e2e8f0; position: relative; overflow: hidden; }
+        .skeleton::after {
+            content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0;
+            transform: translateX(-100%);
+            background-image: linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,0.2) 20%, rgba(255,255,255,0.5) 60%, rgba(255,255,255,0));
+            animation: shimmer 2s infinite;
         }
-        .step-transition {
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .loader {
-            border-top-color: transparent;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        /* Efecto de pulso para disponibilidad */
-        .pulse {
-            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
-            animation: pulse-green 2s infinite;
-        }
-        @keyframes pulse-green {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
-        }
+        @keyframes shimmer { 100% { transform: translateX(100%); } }
     </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
 
-    <div id="app-container" class="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl border border-white/20 overflow-hidden relative">
-        
-        <div id="brand-header" class="p-8 text-center text-white bg-slate-900 transition-all duration-700">
-            <div id="brand-logo" class="text-4xl mb-2">🚖</div>
-            <h1 id="brand-name" class="text-xl font-extrabold uppercase tracking-tighter">Cargando...</h1>
-            <p id="brand-tagline" class="text-[10px] opacity-60 font-bold uppercase tracking-[0.2em] mt-1">Smart Mobility SaaS</p>
+    <!-- Contenedor de Notificaciones (Toasts) -->
+    <div id="toast-container" class="fixed top-5 left-1/2 -translate-x-1/2 z-[100] space-y-2 w-full max-w-xs pointer-events-none"></div>
+
+    <div id="app" class="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden transition-all duration-500">
+        <!-- Header Marca Blanca -->
+        <div id="header" class="p-6 text-center text-white bg-slate-200 skeleton">
+            <h1 id="brand-name" class="text-2xl font-bold opacity-0">TaxiChat</h1>
+            <p class="text-sm opacity-0">Viajes seguros en tiempo real</p>
         </div>
 
-        <div class="p-8">
-            <div id="step-1" class="step-transition space-y-6">
-                <div class="space-y-4">
-                    <div class="relative">
-                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Pasajero</label>
-                        <input type="text" id="input-name" placeholder="Tu nombre completo" 
-                            class="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-slate-900 rounded-2xl outline-none transition-all placeholder:text-slate-300">
-                    </div>
-
-                    <div class="relative">
-                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Origen</label>
-                        <input type="text" id="input-origin" placeholder="¿Dónde te buscamos?" 
-                            class="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-slate-900 rounded-2xl outline-none transition-all placeholder:text-slate-300">
-                        <button onclick="detectLocation()" class="absolute right-4 top-10 text-slate-400 hover:text-slate-900 transition-colors">
-                            📍
-                        </button>
-                    </div>
-
-                    <div class="relative">
-                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Destino</label>
-                        <input type="text" id="input-destination" placeholder="¿A dónde vas?" 
-                            class="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-slate-900 rounded-2xl outline-none transition-all placeholder:text-slate-300">
-                    </div>
-                </div>
-
-                <div id="price-box" class="hidden animate-in fade-in slide-in-from-top-2 bg-slate-900 text-white p-6 rounded-3xl flex justify-between items-center shadow-xl">
-                    <div>
-                        <p class="text-[10px] opacity-50 font-bold uppercase tracking-wider">Tarifa Estimada</p>
-                        <p id="display-price" class="text-3xl font-extrabold">$0.00</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-[10px] opacity-50 font-bold uppercase tracking-wider">Llegada</p>
-                        <p class="text-sm font-bold">~ 4-7 min</p>
-                    </div>
-                </div>
-
-                <button id="btn-main" onclick="processOrder()" 
-                    class="w-full py-5 bg-slate-900 text-white font-extrabold rounded-2xl shadow-xl transform active:scale-[0.97] transition-all uppercase tracking-widest text-sm">
-                    Solicitar Viaje
-                </button>
+        <!-- Pantalla 1: Formulario -->
+        <div id="step-form" class="p-6 space-y-4">
+            <div class="space-y-2">
+                <label class="text-sm font-semibold text-gray-600 uppercase tracking-wider">Tu nombre</label>
+                <input type="text" id="user-name" placeholder="Ej: Luis Grasso" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
             </div>
 
-            <div id="step-2" class="hidden step-transition py-10 text-center space-y-6">
-                <div class="flex justify-center">
-                    <div class="loader w-16 h-16 border-4 border-slate-100 border-t-slate-900 rounded-full"></div>
+            <div class="space-y-2">
+                <label class="text-sm font-semibold text-gray-600 uppercase tracking-wider">Origen (Recogida)</label>
+                <div class="relative">
+                    <input type="text" id="origin-input" placeholder="Detectando ubicación..." class="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                    <button onclick="getGeoLocation()" class="absolute right-3 top-3.5 text-blue-600 hover:scale-110 transition-transform">
+                        📍
+                    </button>
                 </div>
-                <div class="space-y-2">
-                    <h3 class="text-xl font-extrabold text-slate-900 uppercase">Buscando Unidad</h3>
-                    <p class="text-sm text-slate-400 px-6">Estamos notificando a los choferes más cercanos a tu ubicación.</p>
-                </div>
-                <button onclick="goToStep(1)" class="text-xs font-bold text-red-400 uppercase tracking-widest hover:text-red-600 transition-colors">Cancelar</button>
             </div>
 
-            <div id="step-3" class="hidden step-transition space-y-6 animate-in zoom-in duration-500">
-                <div class="flex flex-col items-center text-center space-y-4">
-                    <div class="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center pulse">
-                        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
-                    </div>
-                    <h3 class="text-2xl font-extrabold text-slate-900 uppercase tracking-tighter">¡Viaje en camino!</h3>
-                </div>
+            <div class="space-y-2">
+                <label class="text-sm font-semibold text-gray-600 uppercase tracking-wider">Destino</label>
+                <input type="text" id="destination-input" placeholder="¿A dónde vas?" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+            </div>
 
-                <div class="bg-slate-50 border border-slate-100 p-6 rounded-[2rem] space-y-4">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Chofer asignado</p>
-                            <p id="driver-name" class="text-lg font-extrabold text-slate-900">Cargando...</p>
-                        </div>
-                        <div class="bg-white px-3 py-1 rounded-full border border-slate-200 text-[10px] font-black">⭐ 4.9</div>
+            <div id="estimation-box" class="hidden p-4 bg-blue-50 rounded-xl border border-blue-100 flex justify-between items-center">
+                <div>
+                    <p class="text-xs text-blue-600 font-bold uppercase">Precio Estimado</p>
+                    <p id="estimated-price" class="text-xl font-bold text-blue-800">$0.00</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs text-gray-500">Distancia</p>
+                    <p id="distance-text" class="font-semibold text-gray-700">0 km</p>
+                </div>
+            </div>
+
+            <button id="btn-request" onclick="requestTaxi()" class="w-full py-4 bg-slate-200 skeleton text-transparent font-bold rounded-xl shadow-lg transform active:scale-95 transition-all">
+                PEDIR TAXI AHORA
+            </button>
+        </div>
+
+        <!-- Pantalla 2: Buscando -->
+        <div id="step-searching" class="hidden p-10 text-center space-y-6">
+            <div class="relative flex justify-center">
+                <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-24 w-24"></div>
+                <div class="absolute inset-0 flex items-center justify-center font-bold text-blue-600">🚕</div>
+            </div>
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">Buscando vehículo...</h2>
+                <p class="text-gray-500">Estamos conectando con los choferes disponibles en tu zona.</p>
+            </div>
+            <button onclick="cancelRequest()" class="text-sm text-red-500 font-semibold hover:underline">Cancelar solicitud</button>
+        </div>
+
+        <!-- Pantalla 3: Confirmación -->
+        <div id="step-confirmed" class="hidden p-8 text-center space-y-4">
+            <div class="text-5xl">✅</div>
+            <h2 class="text-2xl font-bold text-gray-800">¡Viaje Confirmado!</h2>
+            <div class="bg-gray-50 p-4 rounded-2xl text-left border border-gray-100">
+                <p class="text-sm text-gray-500">Chofer asignado:</p>
+                <p id="driver-name" class="font-bold text-lg text-gray-800">Cargando...</p>
+                <div class="mt-2 flex justify-between items-center">
+                    <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">En camino</span>
+                    <span id="wait-time" class="text-sm font-semibold text-gray-600">5-8 min</span>
+                </div>
+            </div>
+            <a id="payment-link" href="#" target="_blank" class="block w-full py-3 bg-yellow-400 hover:bg-yellow-500 text-black font-bold rounded-xl transition-all">
+                Pagar con Mercado Pago
+            </a>
+        </div>
+
+        <!-- Pantalla 4: Recibo de Pago -->
+        <div id="step-paid" class="hidden p-6 bg-gray-50">
+            <div class="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+                <div class="bg-green-500 p-4 text-center text-white">
+                    <p class="text-xs font-bold uppercase tracking-widest">Comprobante de Pago</p>
+                    <p class="text-3xl font-black mt-1" id="receipt-amount">$0.00</p>
+                </div>
+                <div class="p-6 space-y-4 font-mono text-sm text-gray-600">
+                    <div class="flex justify-between border-b border-dashed pb-2">
+                        <span>Transacción:</span>
+                        <span id="receipt-id" class="font-bold text-gray-800 text-right">#0000</span>
                     </div>
-                    <div class="pt-4 border-t border-slate-200">
-                        <a id="mp-link" href="#" target="_blank" 
-                            class="flex items-center justify-center gap-3 w-full py-4 bg-[#009EE3] text-white font-bold rounded-2xl hover:brightness-110 transition-all shadow-lg">
-                            <span>Pagar con Mercado Pago</span>
-                        </a>
+                    <div class="space-y-1">
+                        <p class="text-[10px] uppercase font-bold text-gray-400">Detalles del viaje</p>
+                        <p id="receipt-route" class="leading-tight"></p>
+                    </div>
+                    <div class="flex justify-between pt-2">
+                        <span>Chofer:</span>
+                        <span id="receipt-driver" class="font-bold"></span>
+                    </div>
+                    <div class="pt-4 text-center">
+                        <button onclick="window.location.reload()" class="w-full py-3 bg-gray-800 text-white font-bold rounded-xl text-xs uppercase tracking-widest">Pedir otro Taxi</button>
                     </div>
                 </div>
             </div>
@@ -125,88 +133,208 @@
     </div>
 
     <script>
-        // CONFIGURACIÓN SUPABASE (Reemplazar con tus credenciales de .env)
-        const SB_URL = "TU_SUPABASE_URL";
-        const SB_KEY = "TU_SUPABASE_ANON_KEY";
-        const supabase = window.supabase.createClient(SB_URL, SB_KEY);
+        // Función para mostrar notificaciones personalizadas
+        function showToast(message, type = 'error') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const colors = {
+                error: 'bg-red-600',
+                success: 'bg-green-600',
+                info: 'bg-blue-600'
+            };
+            toast.className = `${colors[type]} text-white px-6 py-3 rounded-2xl shadow-2xl transform transition-all duration-300 -translate-y-4 opacity-0 flex items-center justify-between pointer-events-auto`;
+            toast.innerHTML = `<span class="text-sm font-bold">${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.remove('-translate-y-4', 'opacity-0'), 10);
+            setTimeout(() => {
+                toast.classList.add('-translate-y-4', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
 
-        // CONFIGURACIÓN MARCA BLANCA
-        const params = new URLSearchParams(window.location.search);
-        const slug = params.get('slug') || 'default';
+        let supabaseClient;
         let empresaData = null;
+        let distance = 0;
+        const slug = new URLSearchParams(window.location.search).get('slug') || 'default';
 
-        async function loadConfig() {
+        // 1. Inicialización y Carga de Configuración (Marca Blanca)
+        async function init() {
             try {
                 const res = await fetch(`/api/config/${slug}`);
+                if (!res.ok) {
+                    if (res.status === 429) {
+                        const errorData = await res.json();
+                        showToast(errorData.error || "Demasiadas solicitudes. Intenta de nuevo en unos minutos.");
+                    }
+                    throw new Error("Error cargando configuración");
+                }
                 empresaData = await res.json();
                 
-                // Inyectar marca blanca
+                // Aplicar marca blanca
                 document.getElementById('brand-name').innerText = empresaData.nombre;
-                document.getElementById('brand-header').style.backgroundColor = empresaData.config.color || '#0f172a';
-                document.getElementById('btn-main').style.backgroundColor = empresaData.config.color || '#0f172a';
-                
-                // Suscribirse al canal de Realtime para esta empresa
-                const channel = supabase.channel(`admin-${slug}`)
-                    .on('broadcast', { event: 'confirmacion-cliente' }, (payload) => {
-                        handleOrderConfirmed(payload.payload);
-                    })
-                    .subscribe();
+                document.getElementById('header').style.backgroundColor = empresaData.config.color;
+                document.getElementById('btn-request').style.backgroundColor = empresaData.config.color;
 
-            } catch (err) {
-                console.error("Config error:", err);
+                // Remover skeletons
+                document.querySelectorAll('.skeleton').forEach(el => el.classList.remove('skeleton', 'bg-slate-200', 'text-transparent'));
+                document.getElementById('brand-name').classList.remove('opacity-0');
+                document.getElementById('header').querySelector('p').classList.remove('opacity-0');
+                document.getElementById('btn-request').classList.remove('text-transparent');
+
+                // Carga dinámica de Google Maps
+                const script = document.createElement('script');
+                script.src = `https://maps.googleapis.com/maps/api/js?key=${empresaData.publicKeys.googleMaps}&libraries=places`;
+                script.async = true;
+                script.defer = true;
+                script.onload = () => {
+                    setupAutocomplete();
+                    getGeoLocation();
+                };
+                document.head.appendChild(script);
+
+                // Inicialización de Supabase con llaves del servidor
+                supabaseClient = supabase.createClient(
+                    empresaData.publicKeys.supabaseUrl, 
+                    empresaData.publicKeys.supabaseAnonKey
+                );
+                setupRealtime();
+            } catch (e) {
+                console.error("Error cargando configuración", e);
             }
         }
 
-        // Lógica de Precios (Simulada para el PMV)
-        document.getElementById('input-destination').addEventListener('blur', () => {
-            const dest = document.getElementById('input-destination').value;
-            if (dest) {
-                document.getElementById('price-box').classList.remove('hidden');
-                document.getElementById('display-price').innerText = `$${Math.floor(Math.random() * (2500 - 1200) + 1200)}`;
-            }
-        });
+        // 2. Autocompletado y Sugerencias
+        function setupAutocomplete() {
+            const options = { types: ['address'], componentRestrictions: { country: 'AR' } };
+            const originAuto = new google.maps.places.Autocomplete(document.getElementById('origin-input'), options);
+            const destAuto = new google.maps.places.Autocomplete(document.getElementById('destination-input'), options);
 
-        async function processOrder() {
-            const name = document.getElementById('input-name').value;
-            if(!name) return alert("Por favor, ingresa tu nombre");
-
-            goToStep(2);
-
-            // Enviar pedido al Backend
-            const pedido = {
-                usuario: name,
-                origen: document.getElementById('input-origin').value,
-                destino: document.getElementById('input-destination').value,
-                precio: document.getElementById('display-price').innerText,
-                empresaSlug: slug
-            };
-
-            await fetch('/api/nuevo-pedido', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(pedido)
+            [originAuto, destAuto].forEach(auto => {
+                auto.addListener('place_changed', calculatePrice);
             });
         }
 
-        function handleOrderConfirmed(data) {
-            goToStep(3);
-            document.getElementById('driver-name').innerText = data.chofer || "Asignado";
-            document.getElementById('mp-link').href = data.mpLink || "#";
+        // 3. Geolocalización
+        function getGeoLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    const geocoder = new google.maps.Geocoder();
+                    const latlng = { lat: position.coords.latitude, lng: position.coords.longitude };
+                    geocoder.geocode({ location: latlng }, (results, status) => {
+                        if (status === "OK" && results[0]) {
+                            document.getElementById('origin-input').value = results[0].formatted_address;
+                        }
+                    });
+                });
+            }
         }
 
-        function goToStep(num) {
-            [1, 2, 3].forEach(n => document.getElementById(`step-${n}`).classList.add('hidden'));
-            document.getElementById(`step-${num}`).classList.remove('hidden');
+        // 4. Cálculo de Precio y Disponibilidad
+        function calculatePrice() {
+            const origin = document.getElementById('origin-input').value;
+            const dest = document.getElementById('destination-input').value;
+
+            if (origin && dest) {
+                const service = new google.maps.DistanceMatrixService();
+                service.getDistanceMatrix({
+                    origins: [origin],
+                    destinations: [dest],
+                    travelMode: 'DRIVING',
+                }, (response, status) => {
+                    if (status === "OK") {
+                        const data = response.rows[0].elements[0];
+                        distance = data.distance.value / 1000;
+                        const price = (distance * 500) + 200; // Lógica simple: $200 bajada bandera + $500 x km
+                        
+                        document.getElementById('distance-text').innerText = data.distance.text;
+                        document.getElementById('estimated-price').innerText = `$${price.toFixed(2)}`;
+                        document.getElementById('estimation-box').classList.remove('hidden');
+                    }
+                });
+            }
         }
 
-        function detectLocation() {
-            document.getElementById('input-origin').value = "Detectando...";
-            setTimeout(() => {
-                document.getElementById('input-origin').value = "Mi ubicación actual (Mendoza)";
-            }, 1000);
+        // 5. Realtime con Supabase (Vercel Friendly)
+        function setupRealtime() {
+            supabaseClient.channel(`viaje-${slug}`)
+                .on('broadcast', { event: 'confirmacion-cliente' }, (payload) => {
+                    const viaje = payload.payload;
+                    showStep('step-confirmed');
+                    document.getElementById('driver-name').innerText = viaje.chofer;
+                    document.getElementById('wait-time').innerText = viaje.tiempo || '5-10 min';
+
+                    // Guardamos datos para el recibo
+                    window.currentDriver = viaje.chofer;
+
+                    const mpBtn = document.getElementById('payment-link');
+                    if (viaje.mpLink) {
+                        mpBtn.href = viaje.mpLink;
+                        mpBtn.style.display = 'block';
+                    } else {
+                        mpBtn.style.display = 'none';
+                    }
+                })
+                .on('broadcast', { event: 'viaje-pagado' }, (payload) => {
+                    const payment = payload.payload;
+                    
+                    // Llenar datos del recibo
+                    document.getElementById('receipt-amount').innerText = `$${payment.monto.toFixed(2)}`;
+                    document.getElementById('receipt-id').innerText = `#${payment.paymentId}`;
+                    document.getElementById('receipt-driver').innerText = window.currentDriver || 'Asignado';
+                    document.getElementById('receipt-route').innerText = 
+                        `${document.getElementById('origin-input').value.split(',')[0]} ➔ ${document.getElementById('destination-input').value.split(',')[0]}`;
+                    
+                    showStep('step-paid');
+                })
+                .subscribe();
         }
 
-        window.onload = loadConfig;
+        async function requestTaxi() {
+            const data = {
+                usuario: document.getElementById('user-name').value,
+                origen: document.getElementById('origin-input').value,
+                destino: document.getElementById('destination-input').value,
+                precio: parseFloat(document.getElementById('estimated-price').innerText.replace('$', '')),
+                empresaSlug: slug
+            };
+
+            if (!data.usuario || !data.destino) return showToast("Por favor completa los datos");
+
+            showStep('step-searching');
+            
+            try {
+                const response = await fetch('/api/nuevo-pedido', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    // Mostramos el mensaje amigable definido en el backend
+                    alert(errorData.error || "No pudimos procesar tu pedido en este momento.");
+                    showStep('step-form'); // Regresamos al usuario al formulario
+                    return;
+                }
+            } catch (error) {
+                console.error("Error de conexión:", error);
+                showToast("Hubo un problema de conexión. Revisa tu internet e intenta de nuevo.");
+                showStep('step-form');
+            }
+        }
+
+        function showStep(stepId) {
+            ['step-form', 'step-searching', 'step-confirmed', 'step-paid'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById(stepId).classList.remove('hidden');
+        }
+
+        function cancelRequest() {
+            showStep('step-form');
+        }
+
+        window.onload = init;
     </script>
 </body>
 </html>
