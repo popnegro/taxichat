@@ -1,8 +1,11 @@
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const { createClient } = require('@supabase/supabase-js');
 const Joi = require('joi'); // Importar Joi
@@ -12,7 +15,20 @@ const Viaje = require('../models/Viaje');
 
 const app = express();
 app.use(express.json());
-app.use(cors());
+app.use(cookieParser());
+
+const corsOptions = {
+    origin: (origin, callback) => {
+        const allowedPattern = /\.taxichat-beige\.vercel\.app$/;
+        if (!origin || allowedPattern.test(origin) || origin === 'http://localhost:3000') {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true
+};
+app.use(cors(corsOptions));
 app.use(express.static(path.join(__dirname, '../public')));
 
 // --- CONFIGURACIÓN DE RATE LIMITING ---
@@ -45,6 +61,223 @@ const connectDB = async () => {
 };
 
 // --- RUTAS API ---
+
+// Login para Operadores y SuperAdmin
+app.post('/api/login', async (req, res) => {
+    const { password } = req.body;
+    let role = null;
+
+    if (password === process.env.OPERADOR_SECRET) role = 'operador';
+    if (password === process.env.SUPERADMIN_SECRET) role = 'superadmin';
+
+    if (!role) return res.status(401).json({ error: "Credenciales inválidas" });
+
+    // Access Token: Sigue enviándose en el body para guardarlo en memoria o localStorage (vida corta)
+    const accessToken = jwt.sign({ role }, process.env.JWT_SECRET || 'secret_key_pmv', { expiresIn: '15m' });
+    
+    // Refresh Token: Se enviará en una cookie HttpOnly
+    const refreshToken = jwt.sign({ role }, process.env.JWT_REFRESH_SECRET || 'refresh_key_pmv', { expiresIn: '7d' });
+
+    res.cookie('refreshToken', refreshToken, {
+        httpOnly: true, // Protege contra XSS
+        secure: process.env.NODE_ENV === 'production', // Solo sobre HTTPS en producción
+        sameSite: 'Lax', // Permite compartir entre subdominios con seguridad y CSRF básico
+        domain: process.env.NODE_ENV === 'production' ? '.taxichat-beige.vercel.app' : 'localhost',
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 días
+    });
+
+    res.json({ success: true, accessToken });
+});
+
+// Endpoint para refrescar el Access Token
+app.post('/api/refresh-token', async (req, res) => {
+    const refreshToken = req.cookies.refreshToken;
+    if (!refreshToken) return res.status(401).json({ error: "Refresh Token requerido" });
+
+    try {
+        const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || 'refresh_key_pmv');
+        const newAccessToken = jwt.sign({ role: decoded.role }, process.env.JWT_SECRET || 'secret_key_pmv', { expiresIn: '15m' });
+        res.json({ success: true, accessToken: newAccessToken });
+    } catch (err) {
+        res.status(403).json({ error: "Refresh Token inválido o expirado" });
+    }
+});
+
+// Logout para limpiar la cookie
+app.post('/api/logout', (req, res) => {
+    res.clearCookie('refreshToken', { httpOnly: true, sameSite: 'Strict' });
+    res.json({ success: true });
+});
+
+
+// --- MIDDLEWARE DE AUTENTICACIÓN ---
+const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // Formato "Bearer TOKEN"
+
+    if (!token) return res.status(403).json({ error: "Acceso denegado: Token faltante" });
+
+    jwt.verify(token, process.env.JWT_SECRET || 'secret_key_pmv', (err, user) => {
+        if (err) return res.status(401).json({ error: "Sesión inválida o expirada" });
+        req.user = user; // Guardamos el rol (operador/superadmin) para uso posterior
+        next();
+    });
+};
+
+// --- ROUTER ADMINISTRATIVO (Protección Automática) ---
+const adminRouter = express.Router();
+adminRouter.use(authenticateToken); // Todas las rutas en este router requieren JWT
+
+// Registramos el router en la app con un prefijo
+app.use('/api/admin', adminRouter);
+
+
+// --- CALIFICACIÓN DE VIAJES Y ACTUALIZACIÓN DE SEO ---
+app.post('/api/viaje/calificar', async (req, res) => {
+    const { viajeId, calificacion } = req.body;
+
+    if (!viajeId || calificacion < 1 || calificacion > 5) {
+        return res.status(400).json({ error: "Datos de calificación inválidos" });
+    }
+
+    try {
+        await connectDB();
+        const viaje = await Viaje.findById(viajeId);
+
+        if (!viaje || viaje.calificado) {
+            return res.status(400).json({ error: "El viaje ya fue calificado o no existe" });
+        }
+
+        const empresa = await Empresa.findById(viaje.empresaId);
+        if (!empresa) return res.status(404).json({ error: "Empresa no encontrada" });
+
+        // Lógica de promedio ponderado
+        const currentRating = empresa.config.seo.ratingValue || 0;
+        const currentCount = empresa.config.seo.reviewCount || 0;
+
+        const newCount = currentCount + 1;
+        const newRating = ((currentRating * currentCount) + calificacion) / newCount;
+
+        // Actualización atómica de la empresa
+        empresa.config.seo.ratingValue = Number(newRating.toFixed(1));
+        empresa.config.seo.reviewCount = newCount;
+        await empresa.save();
+
+        // Marcar viaje como calificado
+        viaje.calificacion = calificacion;
+        viaje.calificado = true;
+        await viaje.save();
+
+        res.json({ success: true, newRating: empresa.config.seo.ratingValue });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// --- GENERACIÓN DE SITEMAP XML DINÁMICO ---
+app.get('/sitemap.xml', async (req, res) => {
+    try {
+        await connectDB();
+        const empresas = await Empresa.find({}, 'slug fechaRegistro');
+        const baseUrl = process.env.BASE_URL || 'https://taxichat-beige.vercel.app';
+
+        let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+        <loc>${baseUrl}/</loc>
+        <priority>1.0</priority>
+        <changefreq>daily</changefreq>
+    </url>`;
+
+        // Agregar cada empresa al sitemap
+        empresas.forEach(emp => {
+            // Lógica para subdominios (ej: https://mendoza.taxichat.com)
+            // Si prefieres rutas, usa: const url = `${baseUrl}/reserva?slug=${emp.slug}`;
+            const url = baseUrl.replace('://', `://${emp.slug}.`);
+            const lastMod = emp.fechaRegistro ? emp.fechaRegistro.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+
+            xml += `
+    <url>
+        <loc>${url}</loc>
+        <lastmod>${lastMod}</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+    </url>`;
+        });
+
+        xml += `\n</urlset>`;
+
+        res.header('Content-Type', 'application/xml');
+        res.send(xml);
+    } catch (err) {
+        res.status(500).end();
+    }
+});
+
+// --- MOTOR DE RENDERIZADO SEO DINÁMICO ---
+app.get(['/', '/reserva', '/client'], async (req, res) => {
+    await connectDB();
+    
+    // Detectar slug por query o subdominio
+    const host = req.headers.host || '';
+    let slug = req.query.slug || 'default';
+    if (host.includes('.') && !host.includes('vercel.app') && !host.includes('localhost')) {
+        slug = host.split('.')[0];
+    }
+
+    const empresa = await Empresa.findOne({ slug }) || await Empresa.findOne({ slug: 'default' });
+    
+    // Determinar qué archivo HTML cargar
+    const page = req.path === '/' || req.path === '/reserva' ? 'reserva.html' : 'client.html';
+    const filePath = path.join(__dirname, '../public', page);
+    
+    try {
+        let html = fs.readFileSync(filePath, 'utf8');
+
+        // Inyección de Meta Tags dinámicos
+        const seoTitle = empresa.config.seo?.title || `Viaja con ${empresa.nombre}`;
+        const seoDesc = empresa.config.seo?.description || `Pide tu taxi en ${empresa.nombre} de forma rápida y segura.`;
+
+        // Generación de JSON-LD estructurado
+        const jsonLD = {
+            "@context": "https://schema.org/",
+            "@type": "TaxiService",
+            "name": empresa.nombre,
+            "description": seoDesc,
+            "provider": {
+                "@type": "LocalBusiness",
+                "name": empresa.nombre,
+                "image": empresa.config.logo || `${process.env.BASE_URL}/assets/brand-dark.svg`,
+                "priceRange": empresa.config.seo?.priceRange || "$"
+            },
+            "areaServed": empresa.config.seo?.areaServed || "Mendoza, Argentina",
+            "offers": {
+                "@type": "Offer",
+                "priceCurrency": "ARS",
+                "description": "Servicio de transporte con tarifa estimada"
+            },
+            "aggregateRating": {
+                "@type": "AggregateRating",
+                "ratingValue": empresa.config.seo?.ratingValue || 4.8,
+                "reviewCount": empresa.config.seo?.reviewCount || 120
+            }
+        };
+
+        const jsonLdScript = `<script type="application/ld+json">${JSON.stringify(jsonLD)}</script>`;
+
+        html = html.replace(/{{SEO_TITLE}}/g, seoTitle);
+        html = html.replace(/{{SEO_DESCRIPTION}}/g, seoDesc);
+        html = html.replace(/{{BRAND_COLOR}}/g, empresa.config.color);
+        html = html.replace(/{{CANONICAL_URL}}/g, `https://${host}${req.path}`);
+        html = html.replace(/{{JSON_LD}}/g, jsonLdScript);
+
+        res.send(html);
+    } catch (err) {
+        console.error("Error al renderizar HTML dinámico:", err);
+        res.sendFile(filePath); // Fallback al archivo estático
+    }
+});
+
 
 // 1. Obtener Configuración (Marca Blanca)
 app.get('/api/config/:slug', async (req, res) => {
@@ -120,15 +353,9 @@ app.post('/api/nuevo-pedido', pedidoLimiter, async (req, res) => {
     }
 });
 
-// 3. Confirmar Pedido (Solo Operador)
-app.post('/api/confirmar-pedido', async (req, res) => {
-    const { viajeId, chofer, tiempoEstimado, operadorToken } = req.body;
-
-    // Validación simple de seguridad para el PMV
-    // En producción, aquí usarías Supabase Auth o un JWT
-    if (operadorToken !== process.env.OPERADOR_SECRET && operadorToken !== process.env.SUPERADMIN_SECRET) {
-        return res.status(403).json({ error: "No autorizado" });
-    }
+// 3. Confirmar Pedido (Ahora dentro del router protegido)
+adminRouter.post('/confirmar-pedido', async (req, res) => {
+    const { viajeId, chofer, tiempoEstimado } = req.body;
 
     try {
         await connectDB();

@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TaxiChat - Pedir Viaje</title>
+
+    <!-- SEO DINÁMICO -->
+    <title>{{SEO_TITLE}}</title>
+    <meta name="description" content="{{SEO_DESCRIPTION}}">
+    <link rel="canonical" href="{{CANONICAL_URL}}">
+    <meta name="theme-color" content="{{BRAND_COLOR}}">
+    {{JSON_LD}}
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -124,6 +132,16 @@
                         <span>Chofer:</span>
                         <span id="receipt-driver" class="font-bold"></span>
                     </div>
+                    <div id="rating-section" class="pt-4 border-t border-dashed text-center space-y-2">
+                        <p class="text-[10px] font-black uppercase text-gray-400 tracking-widest">¿Cómo fue tu viaje?</p>
+                        <div class="flex justify-center gap-2">
+                            <button onclick="submitRating(1)" class="text-2xl grayscale hover:grayscale-0 transition-all">⭐</button>
+                            <button onclick="submitRating(2)" class="text-2xl grayscale hover:grayscale-0 transition-all">⭐</button>
+                            <button onclick="submitRating(3)" class="text-2xl grayscale hover:grayscale-0 transition-all">⭐</button>
+                            <button onclick="submitRating(4)" class="text-2xl grayscale hover:grayscale-0 transition-all">⭐</button>
+                            <button onclick="submitRating(5)" class="text-2xl grayscale hover:grayscale-0 transition-all">⭐</button>
+                        </div>
+                    </div>
                     <div class="pt-4 text-center">
                         <button onclick="window.location.reload()" class="w-full py-3 bg-gray-800 text-white font-bold rounded-xl text-xs uppercase tracking-widest">Pedir otro Taxi</button>
                     </div>
@@ -155,7 +173,17 @@
         let supabaseClient;
         let empresaData = null;
         let distance = 0;
-        const slug = new URLSearchParams(window.location.search).get('slug') || 'default';
+
+        function getSlug() {
+            const host = window.location.hostname;
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('slug')) return urlParams.get('slug');
+            if (host.includes('.') && !host.includes('vercel.app') && !host.includes('localhost')) {
+                return host.split('.')[0];
+            }
+            return 'default';
+        }
+        const slug = getSlug();
 
         // 1. Inicialización y Carga de Configuración (Marca Blanca)
         async function init() {
@@ -276,7 +304,8 @@
                 })
                 .on('broadcast', { event: 'viaje-pagado' }, (payload) => {
                     const payment = payload.payload;
-                    
+                    window.currentViajeId = payment.viajeId;
+
                     // Llenar datos del recibo
                     document.getElementById('receipt-amount').innerText = `$${payment.monto.toFixed(2)}`;
                     document.getElementById('receipt-id').innerText = `#${payment.paymentId}`;
@@ -287,6 +316,25 @@
                     showStep('step-paid');
                 })
                 .subscribe();
+        }
+
+        async function submitRating(stars) {
+            if (!window.currentViajeId) return;
+            
+            try {
+                const res = await fetch('/api/viaje/calificar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ viajeId: window.currentViajeId, calificacion: stars })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('rating-section').innerHTML = `<p class="text-green-600 font-bold text-sm">¡Gracias por tu calificación!</p>`;
+                    showToast("Calificación enviada", "success");
+                }
+            } catch (e) {
+                showToast("No se pudo enviar la calificación");
+            }
         }
 
         async function requestTaxi() {

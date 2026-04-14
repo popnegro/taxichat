@@ -17,8 +17,13 @@
         <div class="container mx-auto flex justify-between items-center">
             <h1 id="brand-name" class="text-xl font-bold text-white uppercase tracking-tight">TaxiChat Admin</h1>
             <div class="flex items-center space-x-4">
-                <div class="relative">
-                    <input type="password" id="operador-token" placeholder="Token de Seguridad" class="text-black text-sm px-4 py-2 rounded-xl border-none outline-none focus:ring-2 focus:ring-yellow-400">
+                <div id="login-container" class="flex items-center space-x-2">
+                    <input type="password" id="login-password" placeholder="Clave SuperAdmin" class="text-black text-sm px-4 py-2 rounded-xl border-none outline-none focus:ring-2 focus:ring-yellow-400">
+                    <button onclick="login()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">Entrar</button>
+                </div>
+                <div id="logged-status" class="hidden flex items-center space-x-3">
+                    <span class="text-green-400 text-xs font-black uppercase tracking-widest">● Admin Activo</span>
+                    <button onclick="logout()" class="text-slate-400 hover:text-white text-xs underline">Salir</button>
                 </div>
                 <span id="status-dot" class="h-3 w-3 bg-red-500 rounded-full border-2 border-white shadow-sm" title="Desconectado"></span>
             </div>
@@ -141,18 +146,21 @@
         }
 
         async function confirmTrip(viajeId, chofer, tiempo, btn) {
-            const token = document.getElementById('operador-token').value;
-            if (!token) return alert("Error: Debes ingresar el Token de Seguridad en el panel superior.");
+            const token = await getValidToken();
+            if (!token) return alert("Error: Sesión no iniciada.");
             if (!chofer || !tiempo) return alert("Faltan datos del chofer o tiempo.");
 
             btn.disabled = true;
             btn.innerText = "CONFIRMANDO...";
 
             try {
-                const res = await fetch('/api/confirmar-pedido', {
+                const res = await fetch('/api/admin/confirmar-pedido', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ viajeId, chofer, tiempoEstimado: tiempo, operadorToken: token })
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ viajeId, chofer, tiempoEstimado: tiempo })
                 });
 
                 const result = await res.json();

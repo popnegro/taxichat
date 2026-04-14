@@ -40,6 +40,15 @@ const ViajeSchema = new mongoose.Schema({
         enum: ['buscando', 'confirmado', 'pagado', 'finalizado', 'cancelado'], 
         default: 'buscando' 
     },
+    calificacion: {
+        type: Number,
+        min: 1,
+        max: 5
+    },
+    calificado: {
+        type: Boolean,
+        default: false
+    },
     fecha: { 
         type: Date, 
         default: Date.now 

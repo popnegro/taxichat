@@ -3,7 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reserva tu Viaje | TaxiChat</title>
+    
+    <!-- SEO DINÁMICO -->
+    <title>{{SEO_TITLE}}</title>
+    <meta name="description" content="{{SEO_DESCRIPTION}}">
+    <link rel="canonical" href="{{CANONICAL_URL}}">
+    <meta property="og:title" content="{{SEO_TITLE}}">
+    <meta property="og:description" content="{{SEO_DESCRIPTION}}">
+    <meta name="theme-color" content="{{BRAND_COLOR}}">
+    {{JSON_LD}}
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -167,7 +176,18 @@
          * puedes definir: const FIXED_SLUG = 'taxi-mendoza';
          */
         const FIXED_SLUG = null; 
-        const slug = FIXED_SLUG || new URLSearchParams(window.location.search).get('slug') || 'default';
+        
+        function getSlug() {
+            if (FIXED_SLUG) return FIXED_SLUG;
+            const host = window.location.hostname;
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('slug')) return urlParams.get('slug');
+            if (host.includes('.') && !host.includes('vercel.app') && !host.includes('localhost')) {
+                return host.split('.')[0];
+            }
+            return 'default';
+        }
+        const slug = getSlug();
 
         function showToast(message, type = 'error') {
             const container = document.getElementById('toast-container');
