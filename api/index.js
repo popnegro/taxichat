@@ -8,13 +8,10 @@ const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const { createClient } = require('@supabase/supabase-js');
-const multer = require('multer');
-const XLSX = require('xlsx');
 const Joi = require('joi'); // Importar Joi
 const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
 const Empresa = require('../models/Empresa');
 const Viaje = require('../models/Viaje');
-const Chofer = require('../models/Chofer');
 
 const app = express();
 app.use(express.json());
@@ -22,8 +19,8 @@ app.use(cookieParser());
 
 const corsOptions = {
     origin: (origin, callback) => {
-        const allowedPattern = /\.taxichat-beige\.vercel\.app$/;
-        if (!origin || allowedPattern.test(origin) || origin === 'http://localhost:3000') {
+        const allowedPattern = /\.vercel\.app$/;
+        if (!origin || allowedPattern.test(origin) || origin.includes('localhost')) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
@@ -32,9 +29,6 @@ const corsOptions = {
     credentials: true
 };
 app.use(cors(corsOptions));
-
-// Configuración de Multer (Almacenamiento en memoria para Vercel)
-const upload = multer({ storage: multer.memoryStorage() });
 
 // --- CONFIGURACIÓN DE RATE LIMITING ---
 
@@ -165,323 +159,72 @@ adminRouter.use(authenticateToken); // Todas las rutas en este router requieren 
 app.use('/api/admin', adminRouter);
 
 
-// --- GESTIÓN DE EMPRESAS (SuperAdmin) ---
-adminRouter.get('/empresas', async (req, res) => {
-    if (req.user.role !== 'superadmin') return res.status(403).json({ error: "No autorizado" });
-    try {
-        await connectDB();
-        const empresas = await Empresa.find({});
-        res.json(empresas);
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
+// --- MOTOR DE RENDERIZADO SEO DINÁMICO (Catch-all para Pages) ---
+app.get(['/', '/reserva*', '/client*', '/:slug'], async (req, res, next) => {
+    // Omitir si es una llamada a la API o un recurso con extensión (.js, .css, etc)
+    if (req.path.startsWith('/api') || req.path.includes('.')) return next();
 
-adminRouter.put('/empresa/:id', async (req, res) => {
-    if (req.user.role !== 'superadmin') return res.status(403).json({ error: "No autorizado" });
-    try {
-        await connectDB();
-        const updated = await Empresa.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        res.json({ success: true, empresa: updated });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// --- GENERACIÓN DE PLANTILLAS (Download Template) ---
-adminRouter.get('/template/:entity', async (req, res) => {
-    const { entity } = req.params;
-    
-    if (entity !== 'choferes') {
-        return res.status(400).json({ error: "Entidad no soportada" });
-    }
-
-    // Definir las columnas de la plantilla
-    const data = [
-        ["Nombre", "Telefono", "Licencia", "Vehiculo"]
-    ];
-
-    // Crear el libro y la hoja en memoria
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Plantilla");
-
-    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-
-    res.setHeader('Content-Disposition', `attachment; filename="plantilla_${entity}.xlsx"`);
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.send(buffer);
-});
-
-// --- CARGA MASIVA (Bulk Import) ---
-adminRouter.post('/bulk-import/:entity', upload.single('file'), async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: "No se subió ningún archivo" });
-
-    try {
-        await connectDB();
-        
-        // 1. Leer el archivo desde el buffer
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-
-        if (data.length === 0) throw new Error("El archivo está vacío");
-
-        let result = { success: 0, errors: [] };
-
-        // 2. Procesar según la entidad (Ej: Choferes)
-        if (req.params.entity === 'choferes') {
-            const { empresaId } = req.query; // Pasamos el ID de la empresa por query
-            if (!empresaId) throw new Error("ID de empresa requerido");
-
-            const preparedData = data.map((row, index) => {
-                // Mapeo de columnas de Excel/CSV a campos de DB
-                if (!row.Nombre || !row.Telefono) {
-                    result.errors.push(`Fila ${index + 1}: Faltan campos obligatorios (Nombre/Telefono)`);
-                    return null;
-                }
-                return {
-                    nombre: row.Nombre,
-                    telefono: row.Telefono,
-                    licencia: row.Licencia || '',
-                    vehiculo: row.Vehiculo || '',
-                    empresaId
-                };
-            }).filter(d => d !== null);
-
-            if (preparedData.length > 0) {
-                const inserted = await Chofer.insertMany(preparedData, { ordered: false });
-                result.success = inserted.length;
-            }
-        }
-
-        res.json({ message: "Importación finalizada", ...result });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-
-// --- CALIFICACIÓN DE VIAJES Y ACTUALIZACIÓN DE SEO ---
-app.post('/api/viaje/calificar', async (req, res) => {
-    const { viajeId, calificacion } = req.body;
-
-    if (!viajeId || calificacion < 1 || calificacion > 5) {
-        return res.status(400).json({ error: "Datos de calificación inválidos" });
-    }
-
-    try {
-        await connectDB();
-        const viaje = await Viaje.findById(viajeId);
-
-        if (!viaje || viaje.calificado) {
-            return res.status(400).json({ error: "El viaje ya fue calificado o no existe" });
-        }
-
-        const empresa = await Empresa.findById(viaje.empresaId);
-        if (!empresa) return res.status(404).json({ error: "Empresa no encontrada" });
-
-        // Lógica de promedio ponderado
-        const currentRating = empresa.config.seo.ratingValue || 0;
-        const currentCount = empresa.config.seo.reviewCount || 0;
-
-        const newCount = currentCount + 1;
-        const newRating = ((currentRating * currentCount) + calificacion) / newCount;
-
-        // Actualización atómica de la empresa
-        empresa.config.seo.ratingValue = Number(newRating.toFixed(1));
-        empresa.config.seo.reviewCount = newCount;
-        await empresa.save();
-
-        // Marcar viaje como calificado
-        viaje.calificacion = calificacion;
-        viaje.calificado = true;
-        await viaje.save();
-
-        res.json({ success: true, newRating: empresa.config.seo.ratingValue });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-// --- GENERACIÓN DE SITEMAP XML DINÁMICO ---
-app.get('/sitemap.xml', async (req, res) => {
-    try {
-        await connectDB();
-        const empresas = await Empresa.find({}, 'slug fechaRegistro');
-        const baseUrl = process.env.BASE_URL || 'https://taxichat-beige.vercel.app';
-
-        let xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-    <url>
-        <loc>${baseUrl}/</loc>
-        <priority>1.0</priority>
-        <changefreq>daily</changefreq>
-    </url>`;
-
-        // Agregar cada empresa al sitemap
-        empresas.forEach(emp => {
-            // Lógica para subdominios (ej: https://mendoza.taxichat.com)
-            // Si prefieres rutas, usa: const url = `${baseUrl}/reserva?slug=${emp.slug}`;
-            const url = baseUrl.replace('://', `://${emp.slug}.`);
-            const lastMod = emp.fechaRegistro ? emp.fechaRegistro.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
-
-            xml += `
-    <url>
-        <loc>${url}</loc>
-        <lastmod>${lastMod}</lastmod>
-        <changefreq>weekly</changefreq>
-        <priority>0.8</priority>
-    </url>`;
-        });
-
-        xml += `\n</urlset>`;
-
-        res.header('Content-Type', 'application/xml');
-        res.send(xml);
-    } catch (err) {
-        res.status(500).end();
-    }
-});
-
-// --- MOTOR DE RENDERIZADO SEO DINÁMICO ---
-app.get(['/', '/reserva', '/client'], async (req, res) => {
     await connectDB();
     
-    // Detectar slug por query o subdominio
     const host = req.headers.host || '';
-    let slug = req.query.slug || 'default';
+    let slug = req.query.slug || req.params.slug || 'default';
     if (host.includes('.') && !host.includes('vercel.app') && !host.includes('localhost')) {
         slug = host.split('.')[0];
     }
 
     const empresa = await Empresa.findOne({ slug }) || await Empresa.findOne({ slug: 'default' });
-    
-    // Determinar qué archivo HTML cargar (normalizando rutas)
-    const isBooking = req.path === '/' || req.path.startsWith('/reserva');
-    const page = isBooking ? 'reserva.html' : 'client.html';
+    const isClient = req.path.startsWith('/client');
+    const page = isClient ? 'client.html' : 'reserva.html';
     const filePath = path.join(__dirname, '../public', page);
     
     try {
         let html = fs.readFileSync(filePath, 'utf8');
-
-        // Inyección de Meta Tags dinámicos
         const seoTitle = empresa.config.seo?.title || `Viaja con ${empresa.nombre}`;
         const seoDesc = empresa.config.seo?.description || `Pide tu taxi en ${empresa.nombre} de forma rápida y segura.`;
         const baseUrl = (process.env.BASE_URL || '').replace(/\/$/, '');
-        const protocol = req.headers['x-forwarded-proto'] || 'http';
-        const currentHost = req.headers.host;
-        const currentUrl = `${protocol}://${currentHost}`;
+        const currentUrl = `https://${host}${req.path}`;
 
-        // Generación de JSON-LD estructurado con Breadcrumbs (@graph)
+        // Grafo JSON-LD Simplificado para inyección
         const jsonLD = {
             "@context": "https://schema.org",
-            "@graph": [
-                {
-                    "@type": ["Organization", "LocalBusiness"],
-                    "@id": `${currentUrl}/#organization`,
-                    "name": empresa.nombre,
-                    "url": empresa.config.seo?.url || currentUrl,
-                    "telephone": empresa.config.seo?.telephone || "",
-                    "logo": {
-                        "@type": "ImageObject",
-                        "url": empresa.config.logo || `${baseUrl}/assets/brand-dark.svg`
-                    },
-                    "image": empresa.config.logo || `${baseUrl}/assets/brand-dark.svg`,
-                    "priceRange": empresa.config.seo?.priceRange || "$",
-                    "address": {
-                        "@type": "PostalAddress",
-                        "streetAddress": empresa.config.seo?.address?.streetAddress || "",
-                        "addressLocality": empresa.config.seo?.address?.addressLocality || empresa.config.seo?.areaServed || "Mendoza",
-                        "addressRegion": empresa.config.seo?.address?.addressRegion || "MZ",
-                        "postalCode": empresa.config.seo?.address?.postalCode || "",
-                        "addressCountry": "AR"
-                    }
-                },
-                {
-                    "@type": "TaxiService",
-                    "name": empresa.nombre,
-                    "description": seoDesc,
-                    "provider": { "@id": `${currentUrl}/#organization` },
-                    "areaServed": empresa.config.seo?.areaServed || "Mendoza, Argentina",
-                    "offers": {
-                        "@type": "Offer",
-                        "priceCurrency": "ARS",
-                        "description": "Servicio de transporte con tarifa estimada"
-                    },
-                    "aggregateRating": {
-                        "@type": "AggregateRating",
-                        "ratingValue": empresa.config.seo?.ratingValue || 4.8,
-                        "reviewCount": empresa.config.seo?.reviewCount || 120
-                    }
-                },
-                {
-                    "@type": "BreadcrumbList",
-                    "itemListElement": [
-                        {
-                            "@type": "ListItem",
-                            "position": 1,
-                            "name": "Inicio",
-                            "item": currentUrl
-                        }
-                    ]
-                }
-            ]
+            "@type": "TaxiService",
+            "name": empresa.nombre,
+            "description": seoDesc,
+            "provider": { "@type": "LocalBusiness", "name": empresa.nombre, "image": empresa.config.logo || `${baseUrl}/assets/brand-dark.svg` }
         };
 
-        // Añadir segundo nivel si no estamos en la raíz
-        if (req.path !== '/' && req.path !== '') {
-            jsonLD["@graph"][1].itemListElement.push({
-                "@type": "ListItem",
-                "position": 2,
-                "name": isBooking ? "Reserva" : "Pedir Viaje",
-                "item": `${currentUrl}${req.path}`
-            });
-        }
+        const jsonLdScript = JSON.stringify(jsonLD);
 
-        const jsonLdScript = `<script type="application/ld+json">${JSON.stringify(jsonLD)}</script>`;
-
-        // Uso de funciones de retorno para evitar errores con caracteres especiales en el JSON
         html = html.replace(/{{SEO_TITLE}}/g, () => seoTitle);
         html = html.replace(/{{SEO_DESCRIPTION}}/g, () => seoDesc);
         html = html.replace(/{{BRAND_COLOR}}/g, () => empresa.config.color);
-        html = html.replace(/{{CANONICAL_URL}}/g, () => `https://${host}${req.path}`);
-        html = html.replace(/{{JSON_LD}}/g, () => jsonLdScript); // Comentado para evitar problemas de encoding, se inyectará al final
+        html = html.replace(/{{CANONICAL_URL}}/g, () => currentUrl);
+        html = html.replace(/{{JSON_LD}}/g, () => jsonLdScript);
 
         res.send(html);
     } catch (err) {
-        console.error("Error al renderizar HTML dinámico:", err);
-        res.sendFile(filePath); // Fallback al archivo estático
+        res.sendFile(filePath);
     }
 });
 
 // Servir archivos estáticos después de las rutas dinámicas
 app.use(express.static(path.join(__dirname, '../public')));
 
-
 // 1. Obtener Configuración (Marca Blanca)
 app.get('/api/config/:slug', async (req, res) => {
-    try {
-        await connectDB();
-        let empresa = await Empresa.findOne({ slug: req.params.slug });
-        
-        if (!empresa) {
-            empresa = await Empresa.findOne({ slug: 'default' });
+    await connectDB();
+    let empresa = await Empresa.findOne({ slug: req.params.slug }) || await Empresa.findOne({ slug: 'default' });
+    
+    // Combinamos datos de la DB con variables de entorno públicas
+    const response = {
+        ...empresa.toObject(),
+        publicKeys: {
+            googleMaps: process.env.GOOGLE_MAPS_KEY,
+            supabaseUrl: process.env.SUPABASE_URL,
+            supabaseAnonKey: process.env.SUPABASE_ANON_KEY // Asegúrate de añadir esta al .env
         }
-
-        if (!empresa) {
-            return res.status(404).json({ error: "Configuración de empresa no encontrada en la base de datos." });
-        }
-        
-        const response = {
-            ...empresa.toObject(),
-            publicKeys: {
-                googleMaps: process.env.GOOGLE_MAPS_KEY,
-                supabaseUrl: process.env.SUPABASE_URL,
-                supabaseAnonKey: process.env.SUPABASE_ANON_KEY
-            }
-        };
-        res.json(response);
-    } catch (error) {
-        console.error("Error en /api/config:", error);
-        res.status(500).json({ error: "Error interno del servidor", details: error.message });
-    }
+    };
+    res.json(response);
 });
 
 // Esquema de validación Joi para un nuevo pedido

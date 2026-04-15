@@ -69,6 +69,33 @@
                 </div>
             </div>
         </div>
+
+        <!-- Vista de Gestión de Empresas -->
+        <div id="empresas-view" class="hidden space-y-6">
+            <div class="flex justify-between items-center">
+                <h2 class="text-2xl font-bold text-slate-700">Configuración de Marcas</h2>
+                <div class="bg-blue-600 text-white p-4 rounded-2xl shadow-lg max-w-md">
+                    <p class="text-xs font-bold uppercase mb-2">Importador Inteligente JSON-LD</p>
+                    <textarea id="json-ld-input" placeholder="Pega aquí el <script type='application/ld+json'>..." class="w-full h-20 p-2 text-xs text-black rounded-lg outline-none"></textarea>
+                    <button onclick="importJSONLD()" class="mt-2 w-full bg-yellow-400 text-black text-[10px] font-black py-2 rounded-lg uppercase tracking-widest">Cargar Datos</button>
+                </div>
+                <!-- Importador de Archivos -->
+                <div class="bg-slate-800 text-white p-4 rounded-2xl shadow-lg max-w-md">
+                    <div class="flex justify-between items-center mb-2">
+                        <p class="text-xs font-bold uppercase">Carga Masiva Choferes</p>
+                        <button onclick="downloadTemplate('choferes')" class="text-[9px] text-blue-400 hover:text-blue-300 font-bold underline">Descargar Plantilla</button>
+                    </div>
+                    <select id="import-empresa-id" class="w-full mb-2 p-2 text-xs text-black rounded-lg outline-none">
+                        <option value="">Seleccionar Empresa...</option>
+                    </select>
+                    <input type="file" id="bulk-file" accept=".csv, .xlsx" class="text-[10px] block w-full mb-2">
+                    <button onclick="uploadBulkData()" class="w-full bg-green-500 text-white text-[10px] font-black py-2 rounded-lg uppercase tracking-widest">Procesar Archivo</button>
+                </div>
+            </div>
+            <div id="empresas-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Las empresas se cargan aquí -->
+            </div>
+        </div>
     </main>
 
     <!-- Template para la tarjeta de viaje -->
@@ -97,33 +124,6 @@
                     <input type="text" placeholder="Ej: 5 a 10 min" class="time-input w-full mt-1 p-3 text-sm border-2 border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-all">
                 </div>
                 <button class="confirm-btn w-full bg-slate-800 text-white font-black py-4 rounded-xl hover:bg-slate-900 transition-all shadow-lg active:scale-95 text-xs uppercase tracking-widest">DESPACHAR MÓVIL</button>
-            </div>
-        </div>
-
-        <!-- Vista de Gestión de Empresas -->
-        <div id="empresas-view" class="hidden space-y-6">
-            <div class="flex justify-between items-center">
-                <h2 class="text-2xl font-bold text-slate-700">Configuración de Marcas</h2>
-                <div class="bg-blue-600 text-white p-4 rounded-2xl shadow-lg max-w-md">
-                    <p class="text-xs font-bold uppercase mb-2">Importador Inteligente JSON-LD</p>
-                    <textarea id="json-ld-input" placeholder="Pega aquí el <script type='application/ld+json'>..." class="w-full h-20 p-2 text-xs text-black rounded-lg outline-none"></textarea>
-                    <button onclick="importJSONLD()" class="mt-2 w-full bg-yellow-400 text-black text-[10px] font-black py-2 rounded-lg uppercase tracking-widest">Cargar Datos</button>
-                </div>
-                <!-- Importador de Archivos -->
-                <div class="bg-slate-800 text-white p-4 rounded-2xl shadow-lg max-w-md">
-                    <div class="flex justify-between items-center mb-2">
-                        <p class="text-xs font-bold uppercase">Carga Masiva Choferes</p>
-                        <button onclick="downloadTemplate('choferes')" class="text-[9px] text-blue-400 hover:text-blue-300 font-bold underline">Descargar Plantilla</button>
-                    </div>
-                    <select id="import-empresa-id" class="w-full mb-2 p-2 text-xs text-black rounded-lg outline-none">
-                        <option value="">Seleccionar Empresa...</option>
-                    </select>
-                    <input type="file" id="bulk-file" accept=".csv, .xlsx" class="text-[10px] block w-full mb-2">
-                    <button onclick="uploadBulkData()" class="w-full bg-green-500 text-white text-[10px] font-black py-2 rounded-lg uppercase tracking-widest">Procesar Archivo</button>
-                </div>
-            </div>
-            <div id="empresas-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Las empresas se cargan aquí -->
             </div>
         </div>
     </template>
@@ -261,30 +261,42 @@
 
         let currentEditingEmpresaId = null;
         let supabaseClient;
-        const slug = new URLSearchParams(window.location.search).get('slug') || 'default';
-        const SB_URL = 'https://xynkbghmcioavfmvfwkm.supabase.co';
-        const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'; // Anon Key de Supabase
+        const slug = 'default';
 
         async function init() {
+            if (!checkAuth()) return;
             try {
-                const res = await fetch(`/api/config/${slug}`);
-                const empresa = await res.json();
-                document.getElementById('brand-name').innerText = `Terminal - ${empresa.nombre}`;
-                document.getElementById('navbar').style.backgroundColor = empresa.config.color;
-                document.getElementById('info-slug').innerText = slug.toUpperCase();
+                const res = await fetch(`/api/config/default`);
+                const data = await res.json();
+                document.getElementById('brand-name').innerHTML = `TaxiChat <span class="text-yellow-400">SuperAdmin</span>`;
+                supabaseClient = supabase.createClient(data.publicKeys.supabaseUrl, data.publicKeys.supabaseAnonKey);
+                setupRealtime();
             } catch (e) { console.error("Error cargando dashboard:", e); }
-
-            supabaseClient = supabase.createClient(SB_URL, SB_KEY);
-            setupRealtime();
         }
 
         function setupRealtime() {
-            supabaseClient.channel(`admin-${slug}`)
+            supabaseClient.channel('admin-global')
                 .on('broadcast', { event: 'nuevo-pedido' }, (payload) => {
                     addTripToUI(payload.payload);
                     document.getElementById('status-dot').classList.replace('bg-red-500', 'bg-green-500');
                 })
                 .subscribe();
+        }
+
+        async function loadEmpresas() {
+            const token = await getValidToken();
+            const res = await fetch('/api/admin/empresas', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const empresas = await res.json();
+            const container = document.getElementById('empresas-container');
+            container.innerHTML = empresas.map(emp => `
+                <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                    <h3 class="font-bold text-lg">${emp.nombre}</h3>
+                    <p class="text-xs text-slate-400">Slug: ${emp.slug}</p>
+                    <button onclick="openEditModal('${emp._id}')" class="mt-4 text-blue-600 font-bold text-xs uppercase">Editar SEO</button>
+                </div>
+            `).join('');
         }
 
         function addTripToUI(viaje) {
