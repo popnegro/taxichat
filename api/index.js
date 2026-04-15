@@ -219,6 +219,128 @@ adminRouter.use(authenticateToken); // Todas las rutas en este router requieren 
 // Registramos el router en la app con un prefijo
 app.use('/api/admin', adminRouter);
 
+// --- RUTAS API PÚBLICAS ---
+
+// 1. Obtener Configuración (Marca Blanca)
+app.get('/api/config/:slug', async (req, res) => {
+    try {
+        await connectDB();
+        let empresa = await Empresa.findOne({ slug: req.params.slug }) || await Empresa.findOne({ slug: 'default' });
+        
+        const response = {
+            ...empresa.toObject(),
+            publicKeys: {
+                googleMaps: process.env.GOOGLE_MAPS_KEY,
+                supabaseUrl: process.env.SUPABASE_URL,
+                supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+                googleClientId: process.env.GOOGLE_CLIENT_ID
+            }
+        };
+        res.json(response);
+    } catch (err) {
+        res.status(500).json({ error: "Error al obtener configuración" });
+    }
+});
+
+// Esquema de validación para pedidos
+const nuevoPedidoSchema = Joi.object({
+    usuario: Joi.string().min(3).required(),
+    origen: Joi.string().min(5).required(),
+    destino: Joi.string().min(5).required(),
+    precio: Joi.number().min(0).required(),
+    empresaSlug: Joi.string().required()
+});
+
+// 2. Nuevo Pedido con validación de precio en servidor
+app.post('/api/nuevo-pedido', pedidoLimiter, async (req, res) => {
+    try {
+        const { error, value } = nuevoPedidoSchema.validate(req.body);
+        if (error) return res.status(400).json({ error: error.details[0].message });
+
+        await connectDB();
+        const empresa = await Empresa.findOne({ slug: value.empresaSlug });
+        if (!empresa) return res.status(404).json({ error: "Empresa no encontrada" });
+
+        // SEGURIDAD: Recalcular precio en el servidor
+        let precioValidado = value.precio;
+        try {
+            const mapsUrl = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(value.origen)}&destinations=${encodeURIComponent(value.destino)}&key=${process.env.GOOGLE_MAPS_KEY}`;
+            const mapsRes = await fetch(mapsUrl);
+            const mapsData = await mapsRes.json();
+            if (mapsData.status === 'OK' && mapsData.rows[0].elements[0].status === 'OK') {
+                const distKm = mapsData.rows[0].elements[0].distance.value / 1000;
+                // Lógica: $200 base + $500 por km
+                precioValidado = Number(((distKm * 500) + 200).toFixed(2));
+            }
+        } catch (e) { console.warn("Error validando precio:", e.message); }
+
+        const nuevoViaje = new Viaje({
+            ...value,
+            precio: precioValidado,
+            empresaId: empresa._id,
+            socketIdCliente: req.headers['user-agent'] || "web-client"
+        });
+        await nuevoViaje.save();
+
+        // Notificar via Supabase Realtime
+        const payload = { ...nuevoViaje.toObject(), empresaSlug: value.empresaSlug };
+        await Promise.all([
+            supabase.channel(`admin-${value.empresaSlug}`).send({ type: 'broadcast', event: 'nuevo-pedido', payload }),
+            supabase.channel(`admin-global`).send({ type: 'broadcast', event: 'nuevo-pedido', payload })
+        ]);
+
+        res.json({ success: true, viajeId: nuevoViaje._id });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 3. Confirmar Pedido (Mover dentro del router administrativo)
+adminRouter.post('/confirmar-pedido', async (req, res) => {
+    try {
+        const { viajeId, chofer, tiempoEstimado } = req.body;
+        await connectDB();
+        const viaje = await Viaje.findByIdAndUpdate(viajeId, { 
+            chofer, 
+            tiempoEstimado, 
+            estado: 'confirmado' 
+        }, { new: true }).populate('empresaId');
+
+        if (!viaje) return res.status(404).json({ error: "Viaje no encontrado" });
+
+        let mpLink = null;
+        if (viaje.empresaId.config?.mpToken && viaje.precio > 0) {
+            try {
+                const client = new MercadoPagoConfig({ accessToken: viaje.empresaId.config.mpToken });
+                const preference = new Preference(client);
+                const response = await preference.create({
+                    body: {
+                        items: [{
+                            title: `Viaje TaxiChat - ${viaje.usuario}`,
+                            quantity: 1,
+                            unit_price: Number(viaje.precio),
+                            currency_id: 'ARS'
+                        }],
+                        external_reference: viaje._id.toString(),
+                        notification_url: `${process.env.BASE_URL}/api/webhooks/mercadopago?slug=${viaje.empresaId.slug}`,
+                        auto_return: 'approved'
+                    }
+                });
+                mpLink = response.init_point;
+            } catch (error) { console.error("Error Mercado Pago:", error); }
+        }
+
+        await supabase.channel(`viaje-${viaje.empresaId.slug}`).send({
+            type: 'broadcast',
+            event: 'confirmacion-cliente',
+            payload: { chofer, tiempo: tiempoEstimado, mpLink, viajeId }
+        });
+
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
 // --- MOTOR DE RENDERIZADO SEO DINÁMICO (Catch-all para Pages) ---
 app.get(['/', '/reserva*', '/client*', '/:slug'], async (req, res, next) => {
@@ -284,57 +406,6 @@ app.get(['/', '/reserva*', '/client*', '/:slug'], async (req, res, next) => {
         fallbackHtml = fallbackHtml.replace(/{{JSON_LD}}/g, () => "{}");
 
         res.send(fallbackHtml);
-    }
-});
-
-// 3. Confirmar Pedido (Ruta reparada dentro del adminRouter)
-adminRouter.post('/confirmar-pedido', async (req, res) => {
-    try {
-        const { viajeId, chofer, tiempoEstimado } = req.body;
-        await connectDB();
-        const viaje = await Viaje.findByIdAndUpdate(viajeId, { 
-            chofer, 
-            tiempoEstimado, 
-            estado: 'confirmado' 
-        }, { new: true }).populate('empresaId');
-
-        let mpLink = null;
-
-        // Integración real con Mercado Pago
-        if (viaje.empresaId.config && viaje.empresaId.config.mpToken && viaje.precio > 0) {
-            try {
-                const client = new MercadoPagoConfig({ accessToken: viaje.empresaId.config.mpToken });
-                const preference = new Preference(client);
-
-                const response = await preference.create({
-                    body: {
-                        items: [{
-                            title: `Viaje TaxiChat - ${viaje.usuario}`,
-                            quantity: 1,
-                            unit_price: Number(viaje.precio),
-                            currency_id: 'ARS'
-                        }],
-                        external_reference: viaje._id.toString(),
-                        notification_url: `${process.env.BASE_URL}/api/webhooks/mercadopago?slug=${viaje.empresaId.slug}`,
-                        auto_return: 'approved'
-                    }
-                });
-                mpLink = response.init_point;
-            } catch (error) {
-                console.error("Error al generar link de Mercado Pago:", error);
-            }
-        }
-
-        // Emitir broadcast seguro desde el servidor
-        await supabase.channel(`viaje-${viaje.empresaId.slug}`).send({
-            type: 'broadcast',
-            event: 'confirmacion-cliente',
-            payload: { chofer, tiempo: tiempoEstimado, mpLink, viajeId }
-        });
-
-        res.json({ success: true });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
     }
 });
 
