@@ -20,8 +20,10 @@ app.use(cookieParser());
 
 const corsOptions = {
     origin: (origin, callback) => {
-        const allowedPattern = /\.vercel\.app$/;
-        if (!origin || allowedPattern.test(origin) || origin.includes('localhost')) {
+        const isLocal = !origin || origin.includes('localhost');
+        const isMyDomain = origin && origin.endsWith('.vercel.app');
+
+        if (isLocal || isMyDomain) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
@@ -226,8 +228,17 @@ app.get(['/', '/reserva*', '/client*', '/:slug'], async (req, res, next) => {
     const isClient = req.path.startsWith('/client');
     const page = isClient ? 'client.html' : 'reserva.html';
     const filePath = path.join(__dirname, '../public', page);
-    
+
     try {
+        let html = fs.readFileSync(filePath, 'utf8');
+        
+        // Inyección de variables de entorno (Independientes de la DB)
+        const googleMapsKey = process.env.GOOGLE_MAPS_KEY || '';
+        const mapsParams = `${googleMapsKey}&libraries=places&callback=initMap`;
+        html = html.replace(/{{GOOGLE_MAPS_KEY}}/g, () => mapsParams);
+        html = html.replace(/{{GOOGLE_CLIENT_ID}}/g, () => process.env.GOOGLE_CLIENT_ID || '');
+
+        // Intentar conectar a la DB para datos de marca
         await connectDB();
         
         const host = req.headers.host || '';
@@ -237,14 +248,11 @@ app.get(['/', '/reserva*', '/client*', '/:slug'], async (req, res, next) => {
         }
 
         const empresa = await Empresa.findOne({ slug }) || await Empresa.findOne({ slug: 'default' });
-
-        let html = fs.readFileSync(filePath, 'utf8');
         const seoTitle = empresa.config.seo?.title || `Viaja con ${empresa.nombre}`;
         const seoDesc = empresa.config.seo?.description || `Pide tu taxi en ${empresa.nombre} de forma rápida y segura.`;
         const baseUrl = (process.env.BASE_URL || '').replace(/\/$/, '');
         const currentUrl = `https://${host}${req.path}`;
 
-        // Grafo JSON-LD Simplificado para inyección
         const jsonLD = {
             "@context": "https://schema.org",
             "@type": "TaxiService",
@@ -252,25 +260,22 @@ app.get(['/', '/reserva*', '/client*', '/:slug'], async (req, res, next) => {
             "description": seoDesc,
             "provider": { "@type": "LocalBusiness", "name": empresa.nombre, "image": empresa.config.logo || `${baseUrl}/assets/brand-dark.svg` }
         };
-
         const jsonLdScript = JSON.stringify(jsonLD);
 
         html = html.replace(/{{SEO_TITLE}}/g, () => seoTitle);
         html = html.replace(/{{SEO_DESCRIPTION}}/g, () => seoDesc);
-        html = html.replace(/{{BRAND_COLOR}}/g, () => empresa.config.color);
+        html = html.replace(/{{BRAND_COLOR}}/g, () => empresa.config.color || '#000000');
         html = html.replace(/{{CANONICAL_URL}}/g, () => currentUrl);
         html = html.replace(/{{JSON_LD}}/g, () => jsonLdScript);
-        html = html.replace(/{{GOOGLE_CLIENT_ID}}/g, () => process.env.GOOGLE_CLIENT_ID || '');
-        
-        // Inyectamos la Key + Callback para asegurar carga segura
-        const mapsParams = `${process.env.GOOGLE_MAPS_KEY || ''}&callback=initMap&libraries=places&v=weekly`;
-        html = html.replace(/{{GOOGLE_MAPS_KEY}}/g, () => mapsParams);
-
         html = html.replace(/{{GA_ID}}/g, () => empresa.config.gaId || process.env.GA_TRACKING_ID || 'G-81FQCFDC6N');
 
         res.send(html);
     } catch (err) {
-        res.sendFile(filePath);
+        console.error("Render Error:", err.message);
+        // Fallback: enviar el archivo pero intentar limpiar placeholders básicos para evitar crashes en el cliente
+        let fallbackHtml = fs.readFileSync(filePath, 'utf8');
+        fallbackHtml = fallbackHtml.replace(/{{GOOGLE_MAPS_KEY}}/g, () => process.env.GOOGLE_MAPS_KEY || '');
+        res.send(fallbackHtml);
     }
 });
 

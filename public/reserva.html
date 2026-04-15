@@ -25,6 +25,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+
+    <!-- Google Maps SDK inyectado por el servidor -->
+    <script src="https://maps.googleapis.com/maps/api/js?key={{GOOGLE_MAPS_KEY}}" async defer></script>
+
     <style>
         body { font-family: 'Inter', sans-serif; scroll-behavior: smooth; }
         .loader { border-top-color: #ffffff; animation: spinner 1.5s linear infinite; }
@@ -234,13 +238,6 @@
                 document.getElementById('accent-text').innerText = 'a un clic.';
                 document.getElementById('widget-header').querySelector('h2').classList.remove('opacity-0');
 
-                // Inyectar Google Maps
-                const script = document.createElement('script');
-                script.src = `https://maps.googleapis.com/maps/api/js?key=${empresaData.publicKeys.googleMaps}&libraries=places`;
-                script.async = true; script.defer = true;
-                script.onload = () => setupAutocomplete();
-                document.head.appendChild(script);
-
                 // Supabase
                 supabaseClient = supabase.createClient(empresaData.publicKeys.supabaseUrl, empresaData.publicKeys.supabaseAnonKey);
                 setupRealtime();
@@ -248,7 +245,17 @@
         }
 
         function setupAutocomplete() {
-            const options = { types: ['address'], componentRestrictions: { country: 'AR' } };
+            // Definir límites para la provincia de Mendoza, Argentina
+            const mendozaBounds = new google.maps.LatLngBounds(
+                new google.maps.LatLng(-37.5, -70.5), // Suroeste
+                new google.maps.LatLng(-32.0, -66.5)  // Noreste
+            );
+            const options = { 
+                types: ['address'], 
+                componentRestrictions: { country: 'AR' },
+                bounds: mendozaBounds,
+                strictBounds: true 
+            };
             const originAuto = new google.maps.places.Autocomplete(document.getElementById('origin-input'), options);
             const destAuto = new google.maps.places.Autocomplete(document.getElementById('destination-input'), options);
             [originAuto, destAuto].forEach(auto => auto.addListener('place_changed', calculatePrice));
@@ -340,6 +347,15 @@
         }
 
         window.onload = init;
+
+        window.mapsLoaded = false;
+        window.initMap = function() {
+            window.mapsLoaded = true;
+            setupAutocomplete();
+            getGeoLocation(); // Iniciar geolocalización automática al cargar el mapa
+            window.dispatchEvent(new Event('maps-ready'));
+        };
+
     </script>
 </body>
 </html>

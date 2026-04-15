@@ -23,6 +23,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <!-- Google Maps SDK inyectado por el servidor -->
+    <script src="https://maps.googleapis.com/maps/api/js?key={{GOOGLE_MAPS_KEY}}" async defer></script>
+    
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
         .loader { border-top-color: #3498db; animation: spinner 1.5s linear infinite; }
@@ -217,23 +221,11 @@
                 document.getElementById('header').querySelector('p').classList.remove('opacity-0');
                 document.getElementById('btn-request').classList.remove('text-transparent');
 
-                // Carga dinámica de Google Maps
-                const script = document.createElement('script');
-                script.src = `https://maps.googleapis.com/maps/api/js?key=${empresaData.publicKeys.googleMaps}&libraries=places`;
-                script.async = true;
-                script.defer = true;
-                script.onload = () => {
-                    setupAutocomplete();
-                    getGeoLocation();
-                };
-                document.head.appendChild(script);
-
                 // Inicialización de Supabase con llaves del servidor
                 supabaseClient = supabase.createClient(
                     empresaData.publicKeys.supabaseUrl, 
                     empresaData.publicKeys.supabaseAnonKey
                 );
-                setupRealtime();
             } catch (e) {
                 console.error("Error cargando configuración", e);
             }
@@ -241,7 +233,17 @@
 
         // 2. Autocompletado y Sugerencias
         function setupAutocomplete() {
-            const options = { types: ['address'], componentRestrictions: { country: 'AR' } };
+            // Definir límites para la provincia de Mendoza, Argentina
+            const mendozaBounds = new google.maps.LatLngBounds(
+                new google.maps.LatLng(-37.5, -70.5), // Suroeste
+                new google.maps.LatLng(-32.0, -66.5)  // Noreste
+            );
+            const options = { 
+                types: ['address'], 
+                componentRestrictions: { country: 'AR' },
+                bounds: mendozaBounds,
+                strictBounds: true 
+            };
             const originAuto = new google.maps.places.Autocomplete(document.getElementById('origin-input'), options);
             const destAuto = new google.maps.places.Autocomplete(document.getElementById('destination-input'), options);
 
@@ -391,6 +393,16 @@
         }
 
         window.onload = init;
+
+        window.mapsLoaded = false;
+        window.initMap = function() {
+            console.log("📍 Google Maps SDK cargado");
+            window.mapsLoaded = true;
+            setupAutocomplete();
+            getGeoLocation();
+            setupRealtime(); // Ahora es seguro iniciar el tiempo real
+            window.dispatchEvent(new Event('maps-ready'));
+        };
     </script>
 </body>
 </html>
