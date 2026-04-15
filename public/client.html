@@ -226,6 +226,10 @@
                     empresaData.publicKeys.supabaseUrl, 
                     empresaData.publicKeys.supabaseAnonKey
                 );
+
+                // Si el mapa ya cargó, inicializamos Realtime ahora
+                if (window.mapsLoaded) setupRealtime();
+
             } catch (e) {
                 console.error("Error cargando configuración", e);
             }
@@ -281,8 +285,11 @@
                 }, (response, status) => {
                     if (status === "OK") {
                         const data = response.rows[0].elements[0];
+                        if (data.status === "ZERO_RESULTS") return showToast("No se encontró una ruta válida");
+
                         distance = data.distance.value / 1000;
-                        const price = (distance * 500) + 200; // Lógica simple: $200 bajada bandera + $500 x km
+                        const baseFare = 200;
+                        const price = (distance * 500) + baseFare;
                         
                         document.getElementById('distance-text').innerText = data.distance.text;
                         document.getElementById('estimated-price').innerText = `$${price.toFixed(2)}`;
@@ -294,6 +301,9 @@
 
         // 5. Realtime con Supabase (Vercel Friendly)
         function setupRealtime() {
+            // Evitar ejecución si supabaseClient aún no está listo
+            if (!supabaseClient || !empresaData) return;
+
             supabaseClient.channel(`viaje-${slug}`)
                 .on('broadcast', { event: 'confirmacion-cliente' }, (payload) => {
                     const viaje = payload.payload;
@@ -317,8 +327,10 @@
                     window.currentViajeId = payment.viajeId;
 
                     // Llenar datos del recibo
-                    document.getElementById('receipt-amount').innerText = `$${payment.monto.toFixed(2)}`;
-                    document.getElementById('receipt-id').innerText = `#${payment.paymentId}`;
+                    const monto = payment.monto || 0;
+                    const id = payment.paymentId || 'N/A';
+                    document.getElementById('receipt-amount').innerText = `$${Number(monto).toFixed(2)}`;
+                    document.getElementById('receipt-id').innerText = `#${id}`;
                     document.getElementById('receipt-driver').innerText = window.currentDriver || 'Asignado';
                     document.getElementById('receipt-route').innerText = 
                         `${document.getElementById('origin-input').value.split(',')[0]} ➔ ${document.getElementById('destination-input').value.split(',')[0]}`;
@@ -356,7 +368,7 @@
                 empresaSlug: slug
             };
 
-            if (!data.usuario || !data.destino) return showToast("Por favor completa los datos");
+            if (!data.usuario || !data.origen || !data.destino) return showToast("Por favor completa todos los campos");
 
             showStep('step-searching');
             
@@ -396,11 +408,10 @@
 
         window.mapsLoaded = false;
         window.initMap = function() {
-            console.log("📍 Google Maps SDK cargado");
             window.mapsLoaded = true;
             setupAutocomplete();
             getGeoLocation();
-            setupRealtime(); // Ahora es seguro iniciar el tiempo real
+            setupRealtime(); 
             window.dispatchEvent(new Event('maps-ready'));
         };
     </script>
