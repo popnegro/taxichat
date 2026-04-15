@@ -59,10 +59,38 @@ app.use('/api/', generalLimiter);
 // Supabase Setup
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
+// --- AUTO-INICIALIZACIÓN (Empresa Default) ---
+const seedDefaultEmpresa = async () => {
+    try {
+        const count = await Empresa.countDocuments({ slug: 'default' });
+        if (count === 0) {
+            await Empresa.create({
+                nombre: "TaxiChat Default",
+                slug: "default",
+                config: {
+                    color: "#2563eb",
+                    seo: {
+                        title: "TaxiChat - Tu Viaje Seguro",
+                        description: "La plataforma líder en gestión de traslados white-label.",
+                        areaServed: "Mendoza, Argentina",
+                        ratingValue: 4.8,
+                        reviewCount: 120,
+                        priceRange: "$"
+                    }
+                }
+            });
+            console.log("⭐ Empresa 'default' creada automáticamente.");
+        }
+    } catch (e) {
+        console.error("❌ Error en auto-seeding:", e.message);
+    }
+};
+
 // Conexión MongoDB (Serverless Ready)
 const connectDB = async () => {
     if (mongoose.connection.readyState >= 1) return;
     await mongoose.connect(process.env.MONGO_URI);
+    await seedDefaultEmpresa();
 };
 
 // --- RUTAS API ---
@@ -414,7 +442,7 @@ app.get(['/', '/reserva', '/client'], async (req, res) => {
         html = html.replace(/{{SEO_DESCRIPTION}}/g, () => seoDesc);
         html = html.replace(/{{BRAND_COLOR}}/g, () => empresa.config.color);
         html = html.replace(/{{CANONICAL_URL}}/g, () => `https://${host}${req.path}`);
-        html = html.replace(/{{JSON_LD}}/g, () => jsonLdScript);* // Comentado para evitar problemas de encoding, se inyectará al final
+        html = html.replace(/{{JSON_LD}}/g, () => jsonLdScript); // Comentado para evitar problemas de encoding, se inyectará al final
 
         res.send(html);
     } catch (err) {
