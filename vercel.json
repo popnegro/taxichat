@@ -1,14 +1,14 @@
 {
   "version": 2,
-  "cleanUrls": true,
+  "cleanUrls": false,
   "rewrites": [
     {
       "source": "/api/(.*)",
       "destination": "/api/index.js"
     },
     {
-      "source": "/((?!api|assets|.*\\.html|.*\\.js|.*\\.css|favicon\\.ico).*)",
-      "destination": "/api"
+      "source": "/((?!api|assets|favicon\\.ico|.*\\.).*)",
+      "destination": "/api/index.js"
     }
   ]
 }
