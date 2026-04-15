@@ -272,9 +272,17 @@ app.get(['/', '/reserva*', '/client*', '/:slug'], async (req, res, next) => {
         res.send(html);
     } catch (err) {
         console.error("Render Error:", err.message);
-        // Fallback: enviar el archivo pero intentar limpiar placeholders básicos para evitar crashes en el cliente
         let fallbackHtml = fs.readFileSync(filePath, 'utf8');
-        fallbackHtml = fallbackHtml.replace(/{{GOOGLE_MAPS_KEY}}/g, () => process.env.GOOGLE_MAPS_KEY || '');
+        const googleMapsKey = process.env.GOOGLE_MAPS_KEY || '';
+        const mapsParams = `${googleMapsKey}&libraries=places&callback=initMap`;
+        
+        // Limpieza de emergencia para evitar UI rota
+        fallbackHtml = fallbackHtml.replace(/{{GOOGLE_MAPS_KEY}}/g, () => mapsParams);
+        fallbackHtml = fallbackHtml.replace(/{{SEO_TITLE}}/g, () => "TaxiChat - Error de Conexión");
+        fallbackHtml = fallbackHtml.replace(/{{BRAND_COLOR}}/g, () => "#ef4444");
+        fallbackHtml = fallbackHtml.replace(/{{GA_ID}}/g, () => "");
+        fallbackHtml = fallbackHtml.replace(/{{JSON_LD}}/g, () => "{}");
+
         res.send(fallbackHtml);
     }
 });
@@ -331,7 +339,7 @@ app.post('/api/nuevo-pedido', pedidoLimiter, async (req, res) => {
         const nuevoViaje = new Viaje({
             ...value, // Usar el valor validado por Joi
             empresaId: empresa._id,
-            socketIdCliente: "web-client" // Placeholder para Supabase
+            socketIdCliente: req.headers['user-agent'] || "web-client"
         });
         await nuevoViaje.save();
 
