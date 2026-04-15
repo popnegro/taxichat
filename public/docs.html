@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentación Técnica | TaxiChat SaaS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        code { font-family: 'Fira Code', monospace; }
+        .step-line::before { content: ''; position: absolute; left: 20px; top: 40px; bottom: 0; width: 2px; background: #e2e8f0; }
+    </style>
+</head>
+<body class="p-6 md:p-12">
+    <div class="max-w-5xl mx-auto">
+        <header class="mb-16 border-b border-slate-200 pb-8">
+            <div class="flex items-center gap-4 mb-4">
+                <span class="bg-blue-600 text-white px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest">v2.5 Stable</span>
+                <span class="text-slate-400 text-sm font-medium">Arquitectura SaaS White-Label</span>
+            </div>
+            <h1 class="text-5xl font-[900] tracking-tighter text-slate-900 mb-4 text-balance">Especificación de Implementación <span class="text-blue-600">TaxiChat</span></h1>
+            <p class="text-lg text-slate-500 max-w-2xl">Guía detallada sobre el funcionamiento interno, seguridad y estrategias de escalabilidad del ecosistema.</p>
+        </header>
+
+        <nav class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
+            <a href="#backend" class="p-4 bg-white rounded-2xl shadow-sm border border-slate-100 hover:border-blue-500 transition-all font-bold text-sm text-slate-700 text-center">⚙️ Backend</a>
+            <a href="#security" class="p-4 bg-white rounded-2xl shadow-sm border border-slate-100 hover:border-blue-500 transition-all font-bold text-sm text-slate-700 text-center">🛡️ Seguridad</a>
+            <a href="#seo" class="p-4 bg-white rounded-2xl shadow-sm border border-slate-100 hover:border-blue-500 transition-all font-bold text-sm text-slate-700 text-center">🔍 SEO Dinámico</a>
+            <a href="#realtime" class="p-4 bg-white rounded-2xl shadow-sm border border-slate-100 hover:border-blue-500 transition-all font-bold text-sm text-slate-700 text-center">⚡ Real-time</a>
+        </nav>
+
+        <section id="backend" class="mb-20">
+            <h2 class="text-2xl font-bold mb-8 flex items-center gap-3"><span class="w-8 h-8 bg-slate-900 text-white rounded-lg flex items-center justify-center text-sm">01</span> Núcleo del Sistema</h2>
+            <div class="bg-slate-900 rounded-[2rem] p-8 text-slate-300">
+                <p class="mb-6 leading-relaxed">El backend está construido sobre <strong>Express.js</strong> optimizado para Vercel. Utiliza un motor de renderizado que intercepta las peticiones de archivos estáticos para inyectar metadatos.</p>
+                <div class="grid md:grid-cols-2 gap-8">
+                    <div class="space-y-4">
+                        <h4 class="text-white font-bold uppercase text-xs tracking-widest border-b border-slate-700 pb-2">Tenant Detection</h4>
+                        <p class="text-sm">El sistema identifica a la empresa mediante el <code>req.headers.host</code> (subdominios) o el parámetro <code>slug</code> en la URL. Esto permite que una sola instancia del servidor atienda a miles de marcas.</p>
+                    </div>
+                    <div class="space-y-4">
+                        <h4 class="text-white font-bold uppercase text-xs tracking-widest border-b border-slate-700 pb-2">Bulk Processing</h4>
+                        <p class="text-sm">Utiliza <code>multer</code> y <code>xlsx</code> para procesar archivos en memoria. Las inserciones en base de datos se realizan mediante <code>insertMany</code> con <code>ordered: false</code> para resiliencia.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="security" class="mb-20">
+            <h2 class="text-2xl font-bold mb-8 flex items-center gap-3"><span class="w-8 h-8 bg-slate-900 text-white rounded-lg flex items-center justify-center text-sm">02</span> Flujo de Autenticación</h2>
+            <div class="relative space-y-12">
+                <div class="relative pl-12 step-line">
+                    <div class="absolute left-0 w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold z-10">1</div>
+                    <h3 class="font-bold text-slate-800">Login & Token Issuance</h3>
+                    <p class="text-slate-500 text-sm mt-2">Al validar credenciales, el servidor emite un <strong>AccessToken (15m)</strong> en el body y un <strong>RefreshToken (7d)</strong> en una cookie <code>HttpOnly</code> con flag <code>Lax</code> y <code>Secure</code>.</p>
+                </div>
+                <div class="relative pl-12 step-line">
+                    <div class="absolute left-0 w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold z-10">2</div>
+                    <h3 class="font-bold text-slate-800">Silent Refresh</h3>
+                    <p class="text-slate-500 text-sm mt-2">El frontend detecta la expiración del token localmente y solicita una renovación a <code>/api/refresh-token</code>. El navegador adjunta la cookie automáticamente, protegiéndola contra robos por JavaScript.</p>
+                </div>
+                <div class="relative pl-12">
+                    <div class="absolute left-0 w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold z-10">3</div>
+                    <h3 class="font-bold text-slate-800">DDoS Protection</h3>
+                    <p class="text-slate-500 text-sm mt-2">Middleware <code>express-rate-limit</code> configurado con ventanas de 15 min para APIs generales y límites estrictos para creación de pedidos por IP.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="seo" class="mb-20">
+            <h2 class="text-2xl font-bold mb-8 flex items-center gap-3"><span class="w-8 h-8 bg-slate-900 text-white rounded-lg flex items-center justify-center text-sm">03</span> Estrategia SEO & Metadatos</h2>
+            <div class="bg-white border border-slate-200 rounded-[2rem] overflow-hidden">
+                <div class="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                    <h3 class="font-bold text-slate-800 uppercase text-xs tracking-widest italic">Inyección Dinámica de JSON-LD</h3>
+                    <span class="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded font-bold uppercase">Google Optimized</span>
+                </div>
+                <div class="p-8">
+                    <p class="text-slate-600 text-sm mb-6 leading-relaxed">El servidor lee el archivo HTML y reemplaza los placeholders <code>{{...}}</code>. Genera un grafo de Schema.org que interconecta:</p>
+                    <ul class="grid md:grid-cols-3 gap-4">
+                        <li class="p-4 bg-slate-50 rounded-2xl text-xs font-bold text-slate-700">🏢 Organization (Marca Blanca)</li>
+                        <li class="p-4 bg-slate-50 rounded-2xl text-xs font-bold text-slate-700">🚕 TaxiService (Valoraciones reales)</li>
+                        <li class="p-4 bg-slate-50 rounded-2xl text-xs font-bold text-slate-700">📍 Breadcrumbs (Navegación)</li>
+                    </ul>
+                    <div class="mt-8 p-4 bg-slate-900 rounded-xl">
+                        <code class="text-blue-400 text-[10px]">
+                            // Ejemplo de inyección atómica de calificación<br>
+                            empresa.config.seo.ratingValue = ((currentRating * currentCount) + nuevaNota) / (currentCount + 1);
+                        </code>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="realtime" class="mb-20">
+            <h2 class="text-2xl font-bold mb-8 flex items-center gap-3"><span class="w-8 h-8 bg-slate-900 text-white rounded-lg flex items-center justify-center text-sm">04</span> Comunicación en Tiempo Real</h2>
+            <div class="grid md:grid-cols-2 gap-8">
+                <div class="p-8 bg-blue-600 text-white rounded-[2.5rem] shadow-xl">
+                    <h3 class="text-xl font-bold mb-4 uppercase italic tracking-tighter">Broadcast Channels</h3>
+                    <p class="text-blue-100 text-sm leading-relaxed">Utilizamos <strong>Supabase Realtime</strong> para evitar el overhead de un servidor de Sockets persistente. El backend emite notificaciones a canales aislados por empresa.</p>
+                    <div class="mt-6 flex items-center gap-2">
+                        <div class="w-2 h-2 bg-blue-300 rounded-full animate-ping"></div>
+                        <span class="text-[10px] font-black uppercase tracking-widest">Latencia < 100ms</span>
+                    </div>
+                </div>
+                <div class="p-8 bg-slate-100 rounded-[2.5rem] flex flex-col justify-center">
+                    <h4 class="font-bold text-slate-800 mb-2">Canal Global SuperAdmin</h4>
+                    <p class="text-slate-500 text-xs leading-relaxed">El SuperAdmin está suscrito al canal <code>admin-global</code>, recibiendo el stream de datos consolidado de toda la plataforma para monitoreo macro.</p>
+                </div>
+            </div>
+        </section>
+
+        <footer class="text-center py-20 border-t border-slate-200">
+            <p class="text-[10px] font-black uppercase tracking-[0.5em] text-slate-400">TaxiChat Architecture Design © 2026</p>
+        </footer>
+    </div>
+</body>
+</html>

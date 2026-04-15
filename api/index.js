@@ -8,10 +8,13 @@ const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const { createClient } = require('@supabase/supabase-js');
+const multer = require('multer');
+const XLSX = require('xlsx');
 const Joi = require('joi'); // Importar Joi
 const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
 const Empresa = require('../models/Empresa');
 const Viaje = require('../models/Viaje');
+const Chofer = require('../models/Chofer');
 
 const app = express();
 app.use(express.json());
@@ -29,7 +32,9 @@ const corsOptions = {
     credentials: true
 };
 app.use(cors(corsOptions));
-app.use(express.static(path.join(__dirname, '../public')));
+
+// Configuración de Multer (Almacenamiento en memoria para Vercel)
+const upload = multer({ storage: multer.memoryStorage() });
 
 // --- CONFIGURACIÓN DE RATE LIMITING ---
 
@@ -132,6 +137,99 @@ adminRouter.use(authenticateToken); // Todas las rutas en este router requieren 
 app.use('/api/admin', adminRouter);
 
 
+// --- GESTIÓN DE EMPRESAS (SuperAdmin) ---
+adminRouter.get('/empresas', async (req, res) => {
+    if (req.user.role !== 'superadmin') return res.status(403).json({ error: "No autorizado" });
+    try {
+        await connectDB();
+        const empresas = await Empresa.find({});
+        res.json(empresas);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+adminRouter.put('/empresa/:id', async (req, res) => {
+    if (req.user.role !== 'superadmin') return res.status(403).json({ error: "No autorizado" });
+    try {
+        await connectDB();
+        const updated = await Empresa.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        res.json({ success: true, empresa: updated });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// --- GENERACIÓN DE PLANTILLAS (Download Template) ---
+adminRouter.get('/template/:entity', async (req, res) => {
+    const { entity } = req.params;
+    
+    if (entity !== 'choferes') {
+        return res.status(400).json({ error: "Entidad no soportada" });
+    }
+
+    // Definir las columnas de la plantilla
+    const data = [
+        ["Nombre", "Telefono", "Licencia", "Vehiculo"]
+    ];
+
+    // Crear el libro y la hoja en memoria
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Plantilla");
+
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Disposition', `attachment; filename="plantilla_${entity}.xlsx"`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buffer);
+});
+
+// --- CARGA MASIVA (Bulk Import) ---
+adminRouter.post('/bulk-import/:entity', upload.single('file'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "No se subió ningún archivo" });
+
+    try {
+        await connectDB();
+        
+        // 1. Leer el archivo desde el buffer
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+        if (data.length === 0) throw new Error("El archivo está vacío");
+
+        let result = { success: 0, errors: [] };
+
+        // 2. Procesar según la entidad (Ej: Choferes)
+        if (req.params.entity === 'choferes') {
+            const { empresaId } = req.query; // Pasamos el ID de la empresa por query
+            if (!empresaId) throw new Error("ID de empresa requerido");
+
+            const preparedData = data.map((row, index) => {
+                // Mapeo de columnas de Excel/CSV a campos de DB
+                if (!row.Nombre || !row.Telefono) {
+                    result.errors.push(`Fila ${index + 1}: Faltan campos obligatorios (Nombre/Telefono)`);
+                    return null;
+                }
+                return {
+                    nombre: row.Nombre,
+                    telefono: row.Telefono,
+                    licencia: row.Licencia || '',
+                    vehiculo: row.Vehiculo || '',
+                    empresaId
+                };
+            }).filter(d => d !== null);
+
+            if (preparedData.length > 0) {
+                const inserted = await Chofer.insertMany(preparedData, { ordered: false });
+                result.success = inserted.length;
+            }
+        }
+
+        res.json({ message: "Importación finalizada", ...result });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+
 // --- CALIFICACIÓN DE VIAJES Y ACTUALIZACIÓN DE SEO ---
 app.post('/api/viaje/calificar', async (req, res) => {
     const { viajeId, calificacion } = req.body;
@@ -227,8 +325,9 @@ app.get(['/', '/reserva', '/client'], async (req, res) => {
 
     const empresa = await Empresa.findOne({ slug }) || await Empresa.findOne({ slug: 'default' });
     
-    // Determinar qué archivo HTML cargar
-    const page = req.path === '/' || req.path === '/reserva' ? 'reserva.html' : 'client.html';
+    // Determinar qué archivo HTML cargar (normalizando rutas)
+    const isBooking = req.path === '/' || req.path.startsWith('/reserva');
+    const page = isBooking ? 'reserva.html' : 'client.html';
     const filePath = path.join(__dirname, '../public', page);
     
     try {
@@ -237,39 +336,85 @@ app.get(['/', '/reserva', '/client'], async (req, res) => {
         // Inyección de Meta Tags dinámicos
         const seoTitle = empresa.config.seo?.title || `Viaja con ${empresa.nombre}`;
         const seoDesc = empresa.config.seo?.description || `Pide tu taxi en ${empresa.nombre} de forma rápida y segura.`;
+        const baseUrl = (process.env.BASE_URL || '').replace(/\/$/, '');
+        const protocol = req.headers['x-forwarded-proto'] || 'http';
+        const currentHost = req.headers.host;
+        const currentUrl = `${protocol}://${currentHost}`;
 
-        // Generación de JSON-LD estructurado
+        // Generación de JSON-LD estructurado con Breadcrumbs (@graph)
         const jsonLD = {
-            "@context": "https://schema.org/",
-            "@type": "TaxiService",
-            "name": empresa.nombre,
-            "description": seoDesc,
-            "provider": {
-                "@type": "LocalBusiness",
-                "name": empresa.nombre,
-                "image": empresa.config.logo || `${process.env.BASE_URL}/assets/brand-dark.svg`,
-                "priceRange": empresa.config.seo?.priceRange || "$"
-            },
-            "areaServed": empresa.config.seo?.areaServed || "Mendoza, Argentina",
-            "offers": {
-                "@type": "Offer",
-                "priceCurrency": "ARS",
-                "description": "Servicio de transporte con tarifa estimada"
-            },
-            "aggregateRating": {
-                "@type": "AggregateRating",
-                "ratingValue": empresa.config.seo?.ratingValue || 4.8,
-                "reviewCount": empresa.config.seo?.reviewCount || 120
-            }
+            "@context": "https://schema.org",
+            "@graph": [
+                {
+                    "@type": ["Organization", "LocalBusiness"],
+                    "@id": `${currentUrl}/#organization`,
+                    "name": empresa.nombre,
+                    "url": empresa.config.seo?.url || currentUrl,
+                    "telephone": empresa.config.seo?.telephone || "",
+                    "logo": {
+                        "@type": "ImageObject",
+                        "url": empresa.config.logo || `${baseUrl}/assets/brand-dark.svg`
+                    },
+                    "image": empresa.config.logo || `${baseUrl}/assets/brand-dark.svg`,
+                    "priceRange": empresa.config.seo?.priceRange || "$",
+                    "address": {
+                        "@type": "PostalAddress",
+                        "streetAddress": empresa.config.seo?.address?.streetAddress || "",
+                        "addressLocality": empresa.config.seo?.address?.addressLocality || empresa.config.seo?.areaServed || "Mendoza",
+                        "addressRegion": empresa.config.seo?.address?.addressRegion || "MZ",
+                        "postalCode": empresa.config.seo?.address?.postalCode || "",
+                        "addressCountry": "AR"
+                    }
+                },
+                {
+                    "@type": "TaxiService",
+                    "name": empresa.nombre,
+                    "description": seoDesc,
+                    "provider": { "@id": `${currentUrl}/#organization` },
+                    "areaServed": empresa.config.seo?.areaServed || "Mendoza, Argentina",
+                    "offers": {
+                        "@type": "Offer",
+                        "priceCurrency": "ARS",
+                        "description": "Servicio de transporte con tarifa estimada"
+                    },
+                    "aggregateRating": {
+                        "@type": "AggregateRating",
+                        "ratingValue": empresa.config.seo?.ratingValue || 4.8,
+                        "reviewCount": empresa.config.seo?.reviewCount || 120
+                    }
+                },
+                {
+                    "@type": "BreadcrumbList",
+                    "itemListElement": [
+                        {
+                            "@type": "ListItem",
+                            "position": 1,
+                            "name": "Inicio",
+                            "item": currentUrl
+                        }
+                    ]
+                }
+            ]
         };
+
+        // Añadir segundo nivel si no estamos en la raíz
+        if (req.path !== '/' && req.path !== '') {
+            jsonLD["@graph"][1].itemListElement.push({
+                "@type": "ListItem",
+                "position": 2,
+                "name": isBooking ? "Reserva" : "Pedir Viaje",
+                "item": `${currentUrl}${req.path}`
+            });
+        }
 
         const jsonLdScript = `<script type="application/ld+json">${JSON.stringify(jsonLD)}</script>`;
 
-        html = html.replace(/{{SEO_TITLE}}/g, seoTitle);
-        html = html.replace(/{{SEO_DESCRIPTION}}/g, seoDesc);
-        html = html.replace(/{{BRAND_COLOR}}/g, empresa.config.color);
-        html = html.replace(/{{CANONICAL_URL}}/g, `https://${host}${req.path}`);
-        html = html.replace(/{{JSON_LD}}/g, jsonLdScript);
+        // Uso de funciones de retorno para evitar errores con caracteres especiales en el JSON
+        html = html.replace(/{{SEO_TITLE}}/g, () => seoTitle);
+        html = html.replace(/{{SEO_DESCRIPTION}}/g, () => seoDesc);
+        html = html.replace(/{{BRAND_COLOR}}/g, () => empresa.config.color);
+        html = html.replace(/{{CANONICAL_URL}}/g, () => `https://${host}${req.path}`);
+        html = html.replace(/{{JSON_LD}}/g, () => jsonLdScript);
 
         res.send(html);
     } catch (err) {
@@ -277,6 +422,9 @@ app.get(['/', '/reserva', '/client'], async (req, res) => {
         res.sendFile(filePath); // Fallback al archivo estático
     }
 });
+
+// Servir archivos estáticos después de las rutas dinámicas
+app.use(express.static(path.join(__dirname, '../public')));
 
 
 // 1. Obtener Configuración (Marca Blanca)

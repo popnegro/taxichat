@@ -1,43 +1,41 @@
 # TaxiChat - SaaS de Marca Blanca para Gestión de Taxis
 
-TaxiChat es una solución integral de transporte tipo "White-Label" diseñada para permitir que múltiples agencias de taxis operen bajo su propia identidad visual, utilizando una infraestructura compartida, segura y escalable.
+TaxiChat es una plataforma SaaS de transporte tipo "White-Label" de grado industrial. Permite que múltiples agencias de taxis operen de forma aislada bajo su propia identidad visual, utilizando una infraestructura Serverless unificada, segura y optimizada para SEO.
 
 ## 🚀 Arquitectura del Proyecto
 
-El sistema utiliza un stack moderno basado en **Node.js (Express)**, **MongoDB**, **Supabase (Realtime Broadcast)** para mensajería y **Mercado Pago** para la gestión de pagos. La arquitectura es *Serverless-ready* y soporta despliegues multi-subdominio en **Vercel**.
+El sistema utiliza un stack de alto rendimiento: **Node.js (Express)**, **MongoDB Atlas**, **Supabase (Realtime Broadcast)** para baja latencia y **Mercado Pago API**. La arquitectura es 100% *Serverless* y gestiona dinámicamente inquilinos (tenants) mediante subdominios o rutas.
 
 ## 📁 Funciones de los Archivos
 
 ### 🛠️ Backend (Núcleo)
 
-*   **`/api/index.js`**: Punto de entrada unificado. Gestiona la autenticación JWT (Access & Refresh Tokens), validación de esquemas con Joi, renderizado dinámico de SEO/JSON-LD, generación automática de `sitemap.xml` y procesamiento de Webhooks de pago.
+*   **`/api/index.js`**: Motor principal. Implementa seguridad JWT con Refresh Tokens en cookies HttpOnly, validación Joi, motor de plantillas HTML dinámicas para SEO, importador de Excel/CSV y Webhooks.
 *   **`vercel.json`**: Define los *rewrites* para manejar URLs amigables y la inyección de lógica de servidor en archivos estáticos.
-*   **`vercel.json`**: Configuración de despliegue para Vercel, gestionando el ruteo de funciones serverless y archivos estáticos.
 *   **`.env`**: Archivo de configuración para variables de entorno (Credenciales de DB, Supabase, API Keys).
 
 ### 🗄️ Modelos (Base de Datos)
 
 *   **`/models/Empresa.js`**: Esquema de Mongoose que define a los inquilinos (tenants). Almacena el `slug`, colores de marca, logo y tokens específicos de Mercado Pago.
+*   **`/models/Chofer.js`**: Gestión de flota por empresa. Soporta carga masiva y vinculación con pedidos.
 *   **`/models/Viaje.js`**: Registro de pedidos. Incluye trazabilidad de estados, calificación de usuario (estrellas) y vinculación con transacciones de Mercado Pago.
 
 ### 💻 Frontend: Paneles de Operación
 
-*   **`/public/console.html`**: **Panel del SuperAdmin**. Vista global de todos los pedidos del ecosistema en tiempo real. Requiere `SUPERADMIN_SECRET`.
-*   **`/public/empresa_console.html`**: **Panel del Operador**. Gestión local de flota. Incluye login persistente vía JWT, sonidos de notificación y confirmación segura de viajes.
+*   **`/public/console.html`**: **Centro de Control Global**. Gestión de inquilinos, editor SEO con parser JSON-LD y herramientas de carga masiva de datos (Excel/CSV).
+*   **`/public/empresa_console.html`**: **Consola Operativa de Agencia**. Despacho en tiempo real, alertas sonoras y gestión de sesiones persistentes.
 
 ### 📱 Frontend: Experiencia del Cliente
 
-*   **`/public/reserva.html`**: **Layout SaaS Dinámico**. Landing page con secciones de marketing e inyección de marca blanca. Utiliza *Skeleton Screens* para mejorar el LCP (Largest Contentful Paint).
-*   **`/public/client.html`**: **Widget de Reserva**. Formulario optimizado con Google Places API y sistema de feedback post-viaje (rating).
+*   **`/public/reserva.html`**: **Landing Page Maestra**. Layout dinámico que adapta el SEO y el branding al vuelo. Incluye componentes de confianza y estados de carga (Skeletons).
+*   **`/public/client.html`**: **App Web de Pasajero**. Optimización máxima de UX para geolocalización, pago online y feedback.
 *   **`/public/index.html` / `/public/empresa.html`**: Páginas de marketing y aterrizaje que describen los beneficios del servicio para pasajeros y dueños de flotas.
 
-## 🛠️ Tecnologías Utilizadas
+## 🛡️ Seguridad y SEO Avanzado
 
-*   **Backend**: Node.js, Express, Mongoose.
-*   **Frontend**: Tailwind CSS, Supabase JS SDK (Realtime), Google Maps API.
-*   **Pagos**: Mercado Pago SDK.
-*   **Seguridad**: JWT + Refresh Tokens (HttpOnly Cookies), Joi (Validación), Express Rate Limit (DDoS Protection).
-*   **SEO**: JSON-LD Estructurado, Sitemap XML Dinámico, Meta-tags dinámicos.
+*   **Seguridad**: Implementación de **Cookies HttpOnly** para Refresh Tokens, mitigando ataques XSS. Rate Limiting por IP y validación estricta de esquemas.
+*   **SEO**: Inyección de grafos **JSON-LD (@graph)** que conectan la Organización con el Servicio de Taxi y Breadcrumbs. Generación automática de `sitemap.xml` para indexación de subdominios.
+*   **Data**: Motor de procesamiento de archivos Excel/CSV en memoria para gestión masiva de choferes y clientes en entornos Serverless.
 
 ## ⚙️ Configuración Local
 

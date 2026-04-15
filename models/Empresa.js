@@ -18,6 +18,14 @@ const EmpresaSchema = new mongoose.Schema({
             title: { type: String },
             description: { type: String },
             keywords: { type: String },
+            telephone: { type: String },
+            url: { type: String },
+            address: {
+                streetAddress: { type: String },
+                addressLocality: { type: String },
+                addressRegion: { type: String },
+                postalCode: { type: String }
+            },
             ratingValue: { type: Number, default: 4.8 },
             reviewCount: { type: Number, default: 120 },
             priceRange: { type: String, default: '$' },
