@@ -12,6 +12,7 @@ const Joi = require('joi'); // Importar Joi
 const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
 const Empresa = require('../models/Empresa');
 const Viaje = require('../models/Viaje');
+const Chofer = require('../models/Chofer');
 
 const app = express();
 app.use(express.json());
@@ -88,6 +89,60 @@ const connectDB = async () => {
 };
 
 // --- RUTAS API ---
+
+// Health Check Endpoint
+app.get('/api/status', async (req, res) => {
+    const status = {
+        mongodb: 'disconnected',
+        supabase: 'disconnected',
+        mercadopago: 'disconnected',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString()
+    };
+
+    try {
+        // 1. Verificar MongoDB
+        await connectDB();
+        const dbState = mongoose.connection.readyState;
+        const states = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+        status.mongodb = states[dbState] || 'unknown';
+
+        // 2. Verificar Supabase (llamada ligera a la API REST)
+        // Intentamos obtener la sesión o simplemente verificar conectividad
+        const { data, error } = await supabase.from('_health_check').select('*').limit(1);
+        // Nota: Incluso si la tabla no existe, recibir una respuesta (error 404 o similar) 
+        // confirma que el cliente pudo comunicarse con el servidor de Supabase.
+        if (!error || error.code !== 'PGRST301') { // PGRST301 indica error de API Key/Auth
+            status.supabase = 'connected';
+        }
+
+        // 3. Verificar Mercado Pago (Cuenta Default)
+        const defaultEmpresa = await Empresa.findOne({ slug: 'default' });
+        if (defaultEmpresa?.config?.mpToken) {
+            const mpRes = await fetch('https://api.mercadopago.com/wallet/balance', {
+                headers: { 'Authorization': `Bearer ${defaultEmpresa.config.mpToken}` }
+            });
+            
+            if (mpRes.ok) {
+                const balanceData = await mpRes.json();
+                status.mercadopago = {
+                    status: 'connected',
+                    total: balanceData.total_amount,
+                    currency: balanceData.currency_id
+                };
+            } else {
+                status.mercadopago = mpRes.status === 401 ? 'invalid_token' : 'api_error';
+            }
+        } else {
+            status.mercadopago = 'not_configured';
+        }
+    } catch (err) {
+        console.error('Health Check Error:', err.message);
+    }
+
+    const isHealthy = status.mongodb === 'connected' && status.supabase === 'connected';
+    res.status(isHealthy ? 200 : 503).json(status);
+});
 
 // Login para Operadores y SuperAdmin
 app.post('/api/login', async (req, res) => {
@@ -200,6 +255,7 @@ app.get(['/', '/reserva*', '/client*', '/:slug'], async (req, res, next) => {
         html = html.replace(/{{BRAND_COLOR}}/g, () => empresa.config.color);
         html = html.replace(/{{CANONICAL_URL}}/g, () => currentUrl);
         html = html.replace(/{{JSON_LD}}/g, () => jsonLdScript);
+        html = html.replace(/{{GOOGLE_CLIENT_ID}}/g, () => process.env.GOOGLE_CLIENT_ID || '');
 
         res.send(html);
     } catch (err) {
@@ -221,7 +277,8 @@ app.get('/api/config/:slug', async (req, res) => {
         publicKeys: {
             googleMaps: process.env.GOOGLE_MAPS_KEY,
             supabaseUrl: process.env.SUPABASE_URL,
-            supabaseAnonKey: process.env.SUPABASE_ANON_KEY // Asegúrate de añadir esta al .env
+                supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+                googleClientId: process.env.GOOGLE_CLIENT_ID
         }
     };
     res.json(response);

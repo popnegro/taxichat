@@ -34,7 +34,7 @@
                 <a href="#pricing" class="hover:text-black transition-colors">Planes</a>
                 
                 <div class="flex items-center min-w-[120px]">
-                    <div id="g_id_onload" data-client_id="TU_ID_CLIENTE" data-callback="handleCredentialResponse"></div>
+                    <div id="g_id_onload" data-client_id="{{GOOGLE_CLIENT_ID}}" data-callback="handleCredentialResponse"></div>
                     <div class="g_id_signin" data-type="standard" data-shape="pill"></div>
                 </div>
             </div>
@@ -57,7 +57,7 @@
         
         <div class="pt-4 space-y-4">
             <p class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Acceso Usuarios</p>
-            <div class="g_id_signin" data-type="standard" data-shape="pill" data-size="large" data-width="100%"></div>
+            <div class="g_id_signin" data-client_id="{{GOOGLE_CLIENT_ID}}" data-type="standard" data-shape="pill" data-size="large" data-width="100%"></div>
             
             <a href="https://wa.me/5492613871088" class="w-full bg-black text-white py-5 rounded-2xl text-[12px] font-black uppercase tracking-widest text-center block">
                 Contactar Central 24/7
