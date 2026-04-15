@@ -51,7 +51,9 @@ const pedidoLimiter = rateLimit({
     message: { error: "Límite de pedidos alcanzado. Por favor, contacta a soporte si crees que es un error." }
 });
 
-app.use('/api/', generalLimiter);
+// --- ROUTER PRINCIPAL DE API ---
+const apiRouter = express.Router();
+apiRouter.use(generalLimiter);
 
 // Supabase Setup
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -97,7 +99,7 @@ const connectDB = async () => {
 // --- RUTAS API ---
 
 // Health Check Endpoint
-app.get('/api/status', async (req, res) => {
+apiRouter.get('/status', async (req, res) => {
     const status = {
         mongodb: 'disconnected',
         supabase: 'disconnected',
@@ -151,7 +153,7 @@ app.get('/api/status', async (req, res) => {
 });
 
 // Login para Operadores y SuperAdmin
-app.post('/api/login', async (req, res) => {
+apiRouter.post('/login', async (req, res) => {
     const { password } = req.body;
     let role = null;
 
@@ -178,7 +180,7 @@ app.post('/api/login', async (req, res) => {
 });
 
 // Endpoint para refrescar el Access Token
-app.post('/api/refresh-token', async (req, res) => {
+apiRouter.post('/refresh-token', async (req, res) => {
     const refreshToken = req.cookies.refreshToken;
     if (!refreshToken) return res.status(401).json({ error: "Refresh Token requerido" });
 
@@ -192,7 +194,7 @@ app.post('/api/refresh-token', async (req, res) => {
 });
 
 // Logout para limpiar la cookie
-app.post('/api/logout', (req, res) => {
+apiRouter.post('/logout', (req, res) => {
     res.clearCookie('refreshToken', { httpOnly: true, sameSite: 'Strict' });
     res.json({ success: true });
 });
@@ -216,13 +218,10 @@ const authenticateToken = (req, res, next) => {
 const adminRouter = express.Router();
 adminRouter.use(authenticateToken); // Todas las rutas en este router requieren JWT
 
-// Registramos el router en la app con un prefijo
-app.use('/api/admin', adminRouter);
-
 // --- RUTAS API PÚBLICAS ---
 
 // 1. Obtener Configuración (Marca Blanca)
-app.get('/api/config/:slug', async (req, res) => {
+apiRouter.get('/config/:slug', async (req, res) => {
     try {
         await connectDB();
         let empresa = await Empresa.findOne({ slug: req.params.slug }) || await Empresa.findOne({ slug: 'default' });
@@ -252,7 +251,7 @@ const nuevoPedidoSchema = Joi.object({
 });
 
 // 2. Nuevo Pedido con validación de precio en servidor
-app.post('/api/nuevo-pedido', pedidoLimiter, async (req, res) => {
+apiRouter.post('/nuevo-pedido', pedidoLimiter, async (req, res) => {
     try {
         const { error, value } = nuevoPedidoSchema.validate(req.body);
         if (error) return res.status(400).json({ error: error.details[0].message });
@@ -342,6 +341,10 @@ adminRouter.post('/confirmar-pedido', async (req, res) => {
     }
 });
 
+// Montamos los routers de API
+apiRouter.use('/admin', adminRouter);
+app.use('/api', apiRouter);
+
 // --- MOTOR DE RENDERIZADO SEO DINÁMICO (Catch-all para Pages) ---
 app.get(['/', '/reserva*', '/client*', '/:slug'], async (req, res, next) => {
     // Omitir si es una llamada a la API o un recurso con extensión (.js, .css, etc)
@@ -413,7 +416,7 @@ app.get(['/', '/reserva*', '/client*', '/:slug'], async (req, res, next) => {
 app.use(express.static(path.join(__dirname, '../public')));
 
 // 4. Webhook de Mercado Pago
-app.post('/api/webhooks/mercadopago', async (req, res) => {
+apiRouter.post('/webhooks/mercadopago', async (req, res) => {
     const { type, data } = req.body;
     const { slug } = req.query;
 
