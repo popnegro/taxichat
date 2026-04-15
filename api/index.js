@@ -414,7 +414,7 @@ app.get(['/', '/reserva', '/client'], async (req, res) => {
         html = html.replace(/{{SEO_DESCRIPTION}}/g, () => seoDesc);
         html = html.replace(/{{BRAND_COLOR}}/g, () => empresa.config.color);
         html = html.replace(/{{CANONICAL_URL}}/g, () => `https://${host}${req.path}`);
-        html = html.replace(/{{JSON_LD}}/g, () => jsonLdScript);
+        html = html.replace(/{{JSON_LD}}/g, () => jsonLdScript);* // Comentado para evitar problemas de encoding, se inyectará al final
 
         res.send(html);
     } catch (err) {
