@@ -68,7 +68,7 @@ const seedDefaultEmpresa = async () => {
                 nombre: "TaxiChat Default",
                 slug: "default",
                 config: {
-                    color: "#2563eb",
+                    color: "#000000",
                     gaId: process.env.GA_TRACKING_ID || "G-81FQCFDC6N",
                     seo: {
                         title: "TaxiChat - Tu Viaje Seguro",
@@ -257,8 +257,7 @@ apiRouter.get('/config/:slug', async (req, res) => {
             publicKeys: {
                 googleMaps: process.env.GOOGLE_MAPS_KEY,
                 supabaseUrl: process.env.SUPABASE_URL,
-                supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
-                googleClientId: process.env.GOOGLE_CLIENT_ID
+                supabaseAnonKey: process.env.SUPABASE_ANON_KEY
             }
         };
         res.json(response);
@@ -387,7 +386,6 @@ app.get(['/', '/reserva*', '/client*', '/:slug'], async (req, res, next) => {
         const googleMapsKey = process.env.GOOGLE_MAPS_KEY || '';
         const mapsParams = `${googleMapsKey}&libraries=places&callback=initMap`;
         html = html.replace(/{{GOOGLE_MAPS_KEY}}/g, () => mapsParams);
-        html = html.replace(/{{GOOGLE_CLIENT_ID}}/g, () => process.env.GOOGLE_CLIENT_ID || '');
 
         // Intentar conectar a la DB para datos de marca
         await connectDB();
@@ -430,7 +428,7 @@ app.get(['/', '/reserva*', '/client*', '/:slug'], async (req, res, next) => {
         // Limpieza de emergencia para evitar UI rota
         fallbackHtml = fallbackHtml.replace(/{{GOOGLE_MAPS_KEY}}/g, () => mapsParams);
         fallbackHtml = fallbackHtml.replace(/{{SEO_TITLE}}/g, () => "TaxiChat - Error de Conexión");
-        fallbackHtml = fallbackHtml.replace(/{{BRAND_COLOR}}/g, () => "#ef4444");
+        fallbackHtml = fallbackHtml.replace(/{{BRAND_COLOR}}/g, () => "#000000");
         fallbackHtml = fallbackHtml.replace(/{{GA_ID}}/g, () => "");
         fallbackHtml = fallbackHtml.replace(/{{JSON_LD}}/g, () => "{}");
 
