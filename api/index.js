@@ -104,6 +104,16 @@ apiRouter.get('/status', async (req, res) => {
         mongodb: 'disconnected',
         supabase: 'disconnected',
         mercadopago: 'disconnected',
+        googleMaps: 'untested',
+        envCheck: {
+            MONGO_URI: !!process.env.MONGO_URI,
+            SUPABASE_URL: !!process.env.SUPABASE_URL,
+            SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+            GOOGLE_MAPS_KEY: !!process.env.GOOGLE_MAPS_KEY,
+            JWT_SECRET: !!process.env.JWT_SECRET,
+            MP_ACCESS_TOKEN: !!process.env.MP_ACCESS_TOKEN,
+            BASE_URL: !!process.env.BASE_URL
+        },
         uptime: process.uptime(),
         timestamp: new Date().toISOString()
     };
@@ -114,6 +124,21 @@ apiRouter.get('/status', async (req, res) => {
         const dbState = mongoose.connection.readyState;
         const states = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
         status.mongodb = states[dbState] || 'unknown';
+
+        // 2. Test de fuerza: Validar GOOGLE_MAPS_KEY con una petición real
+        if (process.env.GOOGLE_MAPS_KEY) {
+            try {
+                const testUrl = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=Mendoza&destinations=Lujan+de+Cuyo&key=${process.env.GOOGLE_MAPS_KEY}`;
+                const gRes = await fetch(testUrl);
+                const gData = await gRes.json();
+                
+                if (gData.status === 'OK') {
+                    status.googleMaps = 'active_and_authorized';
+                } else {
+                    status.googleMaps = `error: ${gData.status} - ${gData.error_message || 'Check restrictions'}`;
+                }
+            } catch (e) { status.googleMaps = 'connection_failed'; }
+        }
 
         // 2. Verificar Supabase (llamada ligera a la API REST)
         // Intentamos obtener la sesión o simplemente verificar conectividad
