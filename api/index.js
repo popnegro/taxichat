@@ -287,10 +287,10 @@ app.get(['/', '/reserva*', '/client*', '/:slug'], async (req, res, next) => {
     }
 });
 
-// Servir archivos estáticos después de las rutas dinámicas
-app.use(express.static(path.join(__dirname, '../public')));
-
+// 3. Confirmar Pedido (Ruta reparada dentro del adminRouter)
+adminRouter.post('/confirmar-pedido', async (req, res) => {
     try {
+        const { viajeId, chofer, tiempoEstimado } = req.body;
         await connectDB();
         const viaje = await Viaje.findByIdAndUpdate(viajeId, { 
             chofer, 
@@ -337,6 +337,9 @@ app.use(express.static(path.join(__dirname, '../public')));
         res.status(500).json({ error: e.message });
     }
 });
+
+// Servir archivos estáticos al final
+app.use(express.static(path.join(__dirname, '../public')));
 
 // 4. Webhook de Mercado Pago
 app.post('/api/webhooks/mercadopago', async (req, res) => {
