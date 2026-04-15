@@ -368,7 +368,11 @@
                 empresaSlug: slug
             };
 
-            if (!data.usuario || !data.origen || !data.destino) return showToast("Por favor completa todos los campos");
+            // Validación alineada con el servidor (Joi)
+            if (data.usuario.length < 3) return showToast("El nombre debe tener al menos 3 caracteres");
+            if (data.origen.length < 5) return showToast("Ingresa una dirección de origen válida");
+            if (data.destino.length < 5) return showToast("Ingresa una dirección de destino válida");
+            if (isNaN(data.precio)) return showToast("Error al calcular el precio. Reintenta.");
 
             showStep('step-searching');
             

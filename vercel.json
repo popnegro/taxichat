@@ -7,6 +7,10 @@
       "destination": "/api/index.js"
     },
     {
+      "source": "/(.*).html",
+      "destination": "/api/index.js"
+    },
+    {
       "source": "/((?!api|assets|favicon\\.ico|.*\\.).*)",
       "destination": "/api/index.js"
     }

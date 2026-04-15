@@ -372,8 +372,8 @@ app.use('/api', apiRouter);
 
 // --- MOTOR DE RENDERIZADO SEO DINÁMICO (Catch-all para Pages) ---
 app.get(['/', '/reserva*', '/client*', '/:slug'], async (req, res, next) => {
-    // Omitir si es una llamada a la API o un recurso con extensión (.js, .css, etc)
-    if (req.path.startsWith('/api') || req.path.includes('.')) return next();
+    // Omitir si es una llamada a la API o un recurso estático (JS, CSS, Imágenes)
+    if (req.path.startsWith('/api') || (req.path.includes('.') && !req.path.endsWith('.html'))) return next();
 
     const isClient = req.path.startsWith('/client');
     const page = isClient ? 'client.html' : 'reserva.html';
