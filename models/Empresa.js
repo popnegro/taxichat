@@ -14,6 +14,7 @@ const EmpresaSchema = new mongoose.Schema({
         color: { type: String, default: '#2563eb' },
         logo: { type: String },
         mpToken: { type: String, default: '' },
+        gaId: { type: String, default: '' },
         seo: {
             title: { type: String },
             description: { type: String },

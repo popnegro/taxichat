@@ -64,6 +64,7 @@ const seedDefaultEmpresa = async () => {
                 slug: "default",
                 config: {
                     color: "#2563eb",
+                    gaId: process.env.GA_TRACKING_ID || "G-81FQCFDC6N",
                     seo: {
                         title: "TaxiChat - Tu Viaje Seguro",
                         description: "La plataforma líder en gestión de traslados white-label.",
@@ -256,6 +257,7 @@ app.get(['/', '/reserva*', '/client*', '/:slug'], async (req, res, next) => {
         html = html.replace(/{{CANONICAL_URL}}/g, () => currentUrl);
         html = html.replace(/{{JSON_LD}}/g, () => jsonLdScript);
         html = html.replace(/{{GOOGLE_CLIENT_ID}}/g, () => process.env.GOOGLE_CLIENT_ID || '');
+        html = html.replace(/{{GA_ID}}/g, () => empresa.config.gaId || process.env.GA_TRACKING_ID || 'G-81FQCFDC6N');
 
         res.send(html);
     } catch (err) {
