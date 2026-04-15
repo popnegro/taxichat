@@ -85,7 +85,10 @@ const seedDefaultEmpresa = async () => {
 // Conexión MongoDB (Serverless Ready)
 const connectDB = async () => {
     if (mongoose.connection.readyState >= 1) return;
-    await mongoose.connect(process.env.MONGO_URI);
+    await mongoose.connect(process.env.MONGO_URI, {
+        serverSelectionTimeoutMS: 5000, // Evita esperas infinitas si la DB no responde
+        connectTimeoutMS: 10000,
+    });
     await seedDefaultEmpresa();
 };
 
@@ -220,20 +223,21 @@ app.get(['/', '/reserva*', '/client*', '/:slug'], async (req, res, next) => {
     // Omitir si es una llamada a la API o un recurso con extensión (.js, .css, etc)
     if (req.path.startsWith('/api') || req.path.includes('.')) return next();
 
-    await connectDB();
-    
-    const host = req.headers.host || '';
-    let slug = req.query.slug || req.params.slug || 'default';
-    if (host.includes('.') && !host.includes('vercel.app') && !host.includes('localhost')) {
-        slug = host.split('.')[0];
-    }
-
-    const empresa = await Empresa.findOne({ slug }) || await Empresa.findOne({ slug: 'default' });
     const isClient = req.path.startsWith('/client');
     const page = isClient ? 'client.html' : 'reserva.html';
     const filePath = path.join(__dirname, '../public', page);
     
     try {
+        await connectDB();
+        
+        const host = req.headers.host || '';
+        let slug = req.query.slug || req.params.slug || 'default';
+        if (host.includes('.') && !host.includes('vercel.app') && !host.includes('localhost')) {
+            slug = host.split('.')[0];
+        }
+
+        const empresa = await Empresa.findOne({ slug }) || await Empresa.findOne({ slug: 'default' });
+
         let html = fs.readFileSync(filePath, 'utf8');
         const seoTitle = empresa.config.seo?.title || `Viaja con ${empresa.nombre}`;
         const seoDesc = empresa.config.seo?.description || `Pide tu taxi en ${empresa.nombre} de forma rápida y segura.`;
@@ -257,6 +261,11 @@ app.get(['/', '/reserva*', '/client*', '/:slug'], async (req, res, next) => {
         html = html.replace(/{{CANONICAL_URL}}/g, () => currentUrl);
         html = html.replace(/{{JSON_LD}}/g, () => jsonLdScript);
         html = html.replace(/{{GOOGLE_CLIENT_ID}}/g, () => process.env.GOOGLE_CLIENT_ID || '');
+        
+        // Inyectamos la Key + Callback para asegurar carga segura
+        const mapsParams = `${process.env.GOOGLE_MAPS_KEY || ''}&callback=initMap&libraries=places&v=weekly`;
+        html = html.replace(/{{GOOGLE_MAPS_KEY}}/g, () => mapsParams);
+
         html = html.replace(/{{GA_ID}}/g, () => empresa.config.gaId || process.env.GA_TRACKING_ID || 'G-81FQCFDC6N');
 
         res.send(html);
@@ -322,23 +331,25 @@ app.post('/api/nuevo-pedido', pedidoLimiter, async (req, res) => {
         await nuevoViaje.save();
 
         const payload = { ...nuevoViaje.toObject(), empresaSlug: value.empresaSlug };
+        console.log("🚀 Despachando evento Realtime para:", value.empresaSlug);
 
-        // Notificamos a la empresa específica
-        await supabase.channel(`admin-${value.empresaSlug}`).send({
-            type: 'broadcast',
-            event: 'nuevo-pedido',
-            payload: payload
-        });
-
-        // Notificamos al SuperAdmin (Panel Global)
-        await supabase.channel(`admin-global`).send({
-            type: 'broadcast',
-            event: 'nuevo-pedido',
-            payload: payload
-        });
+        // Notificamos usando Promise.all para no bloquear y manejar errores individualmente
+        const channels = [`admin-${value.empresaSlug}`, `admin-global`];
+        await Promise.all(channels.map(async (channelName) => {
+            try {
+                await supabase.channel(channelName).send({
+                    type: 'broadcast',
+                    event: 'nuevo-pedido',
+                    payload: payload
+                });
+            } catch (sendError) {
+                console.error(`❌ Error enviando a canal ${channelName}:`, sendError.message);
+            }
+        }));
 
         res.json({ success: true, viajeId: nuevoViaje._id });
     } catch (e) {
+        console.error("❌ Error en /api/nuevo-pedido:", e.message);
         res.status(500).json({ error: e.message });
     }
 });
