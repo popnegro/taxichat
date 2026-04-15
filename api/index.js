@@ -429,19 +429,31 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 // 1. Obtener Configuración (Marca Blanca)
 app.get('/api/config/:slug', async (req, res) => {
-    await connectDB();
-    let empresa = await Empresa.findOne({ slug: req.params.slug }) || await Empresa.findOne({ slug: 'default' });
-    
-    // Combinamos datos de la DB con variables de entorno públicas
-    const response = {
-        ...empresa.toObject(),
-        publicKeys: {
-            googleMaps: process.env.GOOGLE_MAPS_KEY,
-            supabaseUrl: process.env.SUPABASE_URL,
-            supabaseAnonKey: process.env.SUPABASE_ANON_KEY // Asegúrate de añadir esta al .env
+    try {
+        await connectDB();
+        let empresa = await Empresa.findOne({ slug: req.params.slug });
+        
+        if (!empresa) {
+            empresa = await Empresa.findOne({ slug: 'default' });
         }
-    };
-    res.json(response);
+
+        if (!empresa) {
+            return res.status(404).json({ error: "Configuración de empresa no encontrada en la base de datos." });
+        }
+        
+        const response = {
+            ...empresa.toObject(),
+            publicKeys: {
+                googleMaps: process.env.GOOGLE_MAPS_KEY,
+                supabaseUrl: process.env.SUPABASE_URL,
+                supabaseAnonKey: process.env.SUPABASE_ANON_KEY
+            }
+        };
+        res.json(response);
+    } catch (error) {
+        console.error("Error en /api/config:", error);
+        res.status(500).json({ error: "Error interno del servidor", details: error.message });
+    }
 });
 
 // Esquema de validación Joi para un nuevo pedido
