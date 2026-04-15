@@ -15,6 +15,7 @@ const Viaje = require('../models/Viaje');
 const Chofer = require('../models/Chofer');
 
 const app = express();
+app.set('trust proxy', 1); // Confiar en el proxy de Vercel para obtener la IP real del cliente
 app.use(express.json());
 app.use(cookieParser());
 
@@ -196,8 +197,8 @@ apiRouter.post('/login', async (req, res) => {
     res.cookie('refreshToken', refreshToken, {
         httpOnly: true, // Protege contra XSS
         secure: process.env.NODE_ENV === 'production', // Solo sobre HTTPS en producción
-        sameSite: 'Lax', // Permite compartir entre subdominios con seguridad y CSRF básico
-        domain: process.env.NODE_ENV === 'production' ? '.taxichat-beige.vercel.app' : 'localhost',
+        sameSite: 'Lax', // Permite compartir entre subdominios con seguridad (si el dominio lo permite)
+        domain: process.env.NODE_ENV === 'production' ? req.hostname : 'localhost', // Usar el hostname de la petición para el dominio de la cookie
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 días
     });
 
