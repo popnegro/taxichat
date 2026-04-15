@@ -308,10 +308,16 @@ apiRouter.post('/nuevo-pedido', pedidoLimiter, async (req, res) => {
 
         // Notificar via Supabase Realtime
         const payload = { ...nuevoViaje.toObject(), empresaSlug: value.empresaSlug };
-        await Promise.all([
-            supabase.channel(`admin-${value.empresaSlug}`).send({ type: 'broadcast', event: 'nuevo-pedido', payload }),
-            supabase.channel(`admin-global`).send({ type: 'broadcast', event: 'nuevo-pedido', payload })
+        console.log(`🚀 Intentando broadcast para: admin-${value.empresaSlug}`);
+        
+        const results = await Promise.all([
+            supabase.channel(`admin-${value.empresaSlug}`).send({ type: 'broadcast', event: 'nuevo-pedido', payload: payload }),
+            supabase.channel(`admin-global`).send({ type: 'broadcast', event: 'nuevo-pedido', payload: payload })
         ]);
+
+        results.forEach((res, i) => {
+            console.log(`📊 Resultado Broadcast ${i === 0 ? 'Local' : 'Global'}: ${res}`);
+        });
 
         res.json({ success: true, viajeId: nuevoViaje._id });
     } catch (e) {

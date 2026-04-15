@@ -304,11 +304,14 @@
             // Evitar ejecución si supabaseClient aún no está listo
             if (!supabaseClient || !empresaData) return;
 
-            supabaseClient.channel(`viaje-${slug}`)
+            const channel = supabaseClient.channel(`viaje-${slug}`)
                 .on('broadcast', { event: 'confirmacion-cliente' }, (payload) => {
+                    console.log("📡 Broadcast recibido [confirmacion-cliente]:", payload);
                     const viaje = payload.payload;
+                    if (!viaje) return;
+
                     showStep('step-confirmed');
-                    document.getElementById('driver-name').innerText = viaje.chofer;
+                    document.getElementById('driver-name').innerText = viaje.chofer || 'Chofer asignado';
                     document.getElementById('wait-time').innerText = viaje.tiempo || '5-10 min';
 
                     // Guardamos datos para el recibo
