@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Taxi Mendoza</title>
+
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
+
+  <style>
+    body { font-family: system-ui; background:#f0f2f5; display:flex; justify-content:center; align-items:center; height:100vh;}
+    #app { width:100%; max-width:420px; background:#fff; border-radius:20px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.1);}
+    .header { background:#fbc02d; padding:16px; text-align:center; font-weight:bold;}
+    .chat { height:300px; overflow:auto; padding:16px; display:flex; flex-direction:column; gap:10px;}
+    .bubble { padding:10px 14px; border-radius:14px; max-width:80%;}
+    .bot { background:#eee;}
+    .user { background:#fbc02d; align-self:flex-end;}
+    .controls { padding:16px; display:flex; flex-direction:column; gap:10px;}
+    input, button { padding:12px; border-radius:10px; border:1px solid #ddd;}
+    button { background:#111; color:#fff; cursor:pointer;}
+    #wsBtn { background:#25D366; display:none; text-align:center; color:#fff; text-decoration:none;}
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <div class="header">🚕 Taxi Mendoza</div>
+  <div id="chat" class="chat"></div>
+
+  <div class="controls">
+    <input id="origin" placeholder="Origen"/>
+    <input id="dest" placeholder="Destino" style="display:none"/>
+    <button id="next">Continuar</button>
+    <a id="wsBtn" target="_blank">Confirmar por WhatsApp</a>
+  </div>
+</div>
+
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>
