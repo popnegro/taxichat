@@ -79,32 +79,36 @@ async function init() {
   originInput.addEventListener('input', () => { originPlace = null; statusInfo.textContent = ""; nextBtn.textContent = 'Continuar'; });
   destInput.addEventListener('input', () => { destinationPlace = null; statusInfo.textContent = ""; nextBtn.textContent = 'Continuar'; });
 
-  // Initialize Google Maps PlaceAutocompleteElement components
-  if (maps && maps.places) {
+  // Initialize Google Maps Autocomplete for origin and destination inputs
+  if (maps && maps.places && maps.places.Autocomplete) {
     const mendozaBounds = new maps.LatLngBounds(
       new maps.LatLng(-33.0512, -68.9665), // Suroeste (Luján de Cuyo/Maipú)
       new maps.LatLng(-32.8125, -68.7300)  // Noreste (Las Heras/Guaymallén)
     );
 
-    const setupAutocomplete = (el) => {
-      el.types = ['address'];
-      el.componentRestrictions = { country: 'ar' };
-      el.locationRestriction = mendozaBounds;
-
-      el.addEventListener('gmp-placeselect', async (e) => {
-        const place = e.detail.place;
-        await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location', 'addressComponents', 'id'] });
-        
-        if (el.id === 'origin') originPlace = place;
-        else destinationPlace = place;
-        if (originPlace && destinationPlace) nextBtn.textContent = 'Cotizar viaje';
-      });
+    const options = {
+      types: ['address'],
+      componentRestrictions: { country: 'ar' },
+      bounds: mendozaBounds,
+      strictBounds: true
     };
-    
-    setupAutocomplete(originInput);
-    setupAutocomplete(destInput);
+
+    const originAutocomplete = new maps.places.Autocomplete(originInput, options);
+    const destAutocomplete = new maps.places.Autocomplete(destInput, options);
+
+    originAutocomplete.addListener('place_changed', () => {
+      originPlace = originAutocomplete.getPlace();
+      if (!originPlace.geometry) originPlace = null;
+      if (originPlace && destinationPlace) nextBtn.textContent = 'Cotizar viaje';
+    });
+
+    destAutocomplete.addListener('place_changed', () => {
+      destinationPlace = destAutocomplete.getPlace();
+      if (!destinationPlace.geometry) destinationPlace = null;
+      if (originPlace && destinationPlace) nextBtn.textContent = 'Cotizar viaje';
+    });
   } else {
-    console.warn("PlaceAutocompleteElement not available.");
+    console.warn("Google Maps Places Autocomplete not available.");
   }
 };
 
@@ -242,7 +246,7 @@ nextBtn.onclick = async () => {
 
     if (!originPlace) return showError("No encontramos esa dirección en Mendoza.");
 
-    originInput.value = originPlace.formattedAddress || originPlace.formatted_address || originPlace.displayName || originPlace.name || "";
+    originInput.value = originPlace.formatted_address || originPlace.name; // Use formatted_address or name
     statusInfo.textContent = "";
 
     backBtn.classList.remove('hidden');
@@ -272,7 +276,7 @@ nextBtn.onclick = async () => {
       return showError("El origen y el destino no pueden ser el mismo lugar.");
     }
 
-    destInput.value = destinationPlace.formattedAddress || destinationPlace.formatted_address || destinationPlace.displayName || destinationPlace.name || "";
+    destInput.value = destinationPlace.formatted_address || destinationPlace.name; // Use formatted_address or name
     nextBtn.textContent = 'Cotizar viaje';
 
     addMessage(chat, 'user', getAddressLink(destinationPlace));
