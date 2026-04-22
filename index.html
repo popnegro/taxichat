@@ -222,7 +222,8 @@
             transition: all 0.3s ease;
         }
 
-        .inputs-group .input-wrapper input {
+        .inputs-group .input-wrapper input,
+        .inputs-group .input-wrapper gmp-place-autocomplete {
             border: none !important;
             background: transparent !important;
             border-radius: 0 !important;
@@ -462,11 +463,11 @@
         <div class="inputs-group">
             <div class="input-wrapper">
                 <span class="material-symbols-outlined input-icon" style="color: #bcbcbc;" aria-hidden="true">trip_origin</span>
-                <input type="text" id="origin" placeholder="Buscando ubicación..." aria-label="Dirección de origen">
+                <gmp-place-autocomplete id="origin" placeholder="Buscando ubicación..." aria-label="Dirección de origen"></gmp-place-autocomplete>
             </div>
             <div class="input-wrapper hidden" id="destination-wrapper">
                 <span class="material-symbols-outlined input-icon" style="color: #bcbcbc;" aria-hidden="true">trip_origin</span>
-                <input type="text" id="destination" placeholder="¿A dónde vas?" aria-label="Dirección de destino">
+                <gmp-place-autocomplete id="destination" placeholder="¿A dónde vas?" aria-label="Dirección de destino"></gmp-place-autocomplete>
             </div>
         </div>
         <button class="btn" id="next-btn">Continuar</button>

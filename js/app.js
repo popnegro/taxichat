@@ -81,6 +81,8 @@ async function init() {
 
   // Initialize Google Maps Autocomplete for origin and destination inputs
   if (maps && maps.places && maps.places.Autocomplete) {
+  // Initialize Google Maps PlaceAutocompleteElement
+  if (maps && maps.places) {
     // Definir los límites aproximados de Mendoza (Gran Mendoza)
     const mendozaBounds = new maps.LatLngBounds(
       new maps.LatLng(-33.0512, -68.9665), // Suroeste (Luján de Cuyo/Maipú)
@@ -93,9 +95,21 @@ async function init() {
       bounds: mendozaBounds,
       strictBounds: true // Fuerza a que los resultados estén dentro de los límites definidos
     };
+    // Configurar los componentes web directamente
+    const setupAutocomplete = (el) => {
+      el.types = ['address'];
+      el.componentRestrictions = { country: 'ar' };
+      el.locationRestriction = mendozaBounds;
 
     const originAutocomplete = new maps.places.Autocomplete(originInput, autocompleteOptions);
     const destAutocomplete = new maps.places.Autocomplete(destInput, autocompleteOptions);
+      el.addEventListener('gmp-placeselect', async (e) => {
+        const place = e.detail.place;
+        // En el nuevo API, debemos obtener los campos necesarios explícitamente
+        await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location', 'addressComponents', 'id'] });
+        
+        if (el.id === 'origin') originPlace = place;
+        else destinationPlace = place;
 
     // Optional: Listen for place_changed event if you need to do something when a place is selected
     originAutocomplete.addListener('place_changed', () => {
@@ -108,8 +122,15 @@ async function init() {
       if (!destinationPlace.geometry) destinationPlace = null;
       if (originPlace && destinationPlace) nextBtn.textContent = 'Cotizar viaje';
     });
+        if (originPlace && destinationPlace) nextBtn.textContent = 'Cotizar viaje';
+      });
+    };
+    
+    setupAutocomplete(originInput);
+    setupAutocomplete(destInput);
   } else {
     console.warn("Google Maps Places Autocomplete not available. Check API key and 'places' library loading.");
+    console.warn("PlaceAutocompleteElement not available.");
   }
 }
 
@@ -163,6 +184,10 @@ backBtn.onclick = () => {
 
 function getAddressLink(place) {
   if (!place || !place.geometry) return place?.formatted_address || "Ubicación";
+  // Soporte para objeto Place nuevo (formattedAddress) y antiguo (formatted_address)
+  const address = place.formattedAddress || place.formatted_address || place.displayName || "Ubicación";
+  const components = place.addressComponents || place.address_components || [];
+  const location = place.location || place.geometry?.location;
 
   const components = place.address_components || [];
   const getComp = (type) => components.find(c => c.types.includes(type))?.long_name || "";
@@ -172,9 +197,14 @@ function getAddressLink(place) {
   const dept = getComp("administrative_area_level_2") || getComp("locality");
 
   const label = `${street} ${number}${dept ? ', ' + dept : ''}`.trim() || place.formatted_address;
+  const label = `${street} ${number}${dept ? ', ' + dept : ''}`.trim() || address;
   
   const lat = typeof place.geometry.location.lat === 'function' ? place.geometry.location.lat() : place.geometry.location.lat;
   const lng = typeof place.geometry.location.lng === 'function' ? place.geometry.location.lng() : place.geometry.location.lng;
+  if (!location) return label;
+
+  const lat = typeof location.lat === 'function' ? location.lat() : location.lat;
+  const lng = typeof location.lng === 'function' ? location.lng() : location.lng;
   
   const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
   
