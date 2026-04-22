@@ -35,6 +35,19 @@ export async function getDistance(maps, origin, dest) {
   });
 }
 
+export async function getAddressFromCoords(maps, lat, lng) {
+  const geocoder = new maps.Geocoder();
+  return new Promise((resolve, reject) => {
+    geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+      if (status === "OK" && results[0]) {
+        resolve(results[0].formatted_address);
+      } else {
+        reject("No se pudo encontrar la dirección");
+      }
+    });
+  });
+}
+
 // fallback si no hay maps
 function mockDistance() {
   return {

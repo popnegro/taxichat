@@ -1,7 +1,8 @@
 export async function loadConfig() {
   try {
-    const res = await fetch('/api/config');
-    if (!res.ok) throw new Error();
+    // Using a relative path for the local config file
+    const res = await fetch('./config.json');
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
 
     const cfg = await res.json();
 
@@ -11,7 +12,8 @@ export async function loadConfig() {
       rates: cfg.rates || { base: 500, perKm: 300 }
     };
 
-  } catch {
+  } catch (err) {
+    console.warn("Configuration could not be loaded, using defaults:", err);
     return {
       mapsKey: null,
       whatsapp: "5492613871088",
