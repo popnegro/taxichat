@@ -1,12 +1,22 @@
 export async function loadMaps(apiKey) {
   if (!apiKey) return null;
+  // Evita cargar el script múltiples veces si ya existe
+  if (window.google?.maps) return window.google.maps;
 
   try {
     await new Promise((resolve, reject) => {
+      // Definimos un callback global temporal para que Maps notifique cuando esté 100% listo
+      window.mapsReady = () => {
+        delete window.mapsReady;
+        resolve();
+      };
+
       const s = document.createElement('script');
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-      s.onload = resolve;
-      s.onerror = reject;
+      // Agregamos &callback=mapsReady. Sin esto, loading=async dispara onload prematuramente.
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async&callback=mapsReady`;
+      s.async = true;
+      s.defer = true;
+      s.onerror = () => { delete window.mapsReady; reject(); };
       document.head.appendChild(s);
     });
 
@@ -36,11 +46,13 @@ export async function getDistance(maps, origin, dest) {
 }
 
 export async function getAddressFromCoords(maps, lat, lng) {
+  if (!maps) return null;
+  
   const geocoder = new maps.Geocoder();
   return new Promise((resolve, reject) => {
     geocoder.geocode({ location: { lat, lng } }, (results, status) => {
       if (status === "OK" && results[0]) {
-        resolve(results[0].formatted_address);
+        resolve(results[0]);
       } else {
         reject("No se pudo encontrar la dirección");
       }
