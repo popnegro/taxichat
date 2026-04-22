@@ -7,14 +7,14 @@ export async function loadConfig() {
 
     return {
       mapsKey: cfg.mapsKey || null,
-      whatsapp: cfg.whatsappNumber || "5492613871088"
+      whatsapp: cfg.whatsappNumber || "5492613871088",
       rates: cfg.rates || { base: 500, perKm: 300 }
     };
 
   } catch {
     return {
       mapsKey: null,
-      whatsapp: "5492613871088"
+      whatsapp: "5492613871088",
       rates: { base: 500, perKm: 300 }
     };
   }
