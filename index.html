@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Taxi Mendoza</title>
+  <title>Taxi Chat</title>
   
   <!-- Preconexión para reducir el tiempo de resolución DNS/TLS (Mejora LCP) -->
   <link rel="preconnect" href="https://maps.googleapis.com">
@@ -75,12 +75,22 @@
             padding: 15px 20px; 
             text-align: center; 
             color: var(--header-text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .logo {
+            height: 48px;
+            width: auto;
+            margin-bottom: 8px;
+            object-fit: contain;
         }
 
         .header-title {
             font-weight: 800;
             text-transform: uppercase;
-            font-size: 18px;
+            font-size: 22px;
             line-height: 1.2;
         }
 
@@ -125,7 +135,7 @@
         .input-area { 
             padding: 20px; 
             background: var(--surface);
-            border-top: 1px solid var(--border); 
+            /*border-top: 1px solid var(--border); */
             display: flex; 
             flex-direction: column; 
             gap: 12px; 
@@ -358,7 +368,7 @@
 
         .icon-check { font-size: 64px; color: var(--accent); margin-bottom: 20px; }
         .success-title { font-size: 1.5rem; font-weight: 800; margin-bottom: 10px; color: var(--accent); }
-        .success-text { color: var(--text-dim); font-size: 0.95rem; margin-bottom: 30px; line-height: 1.4; }
+        .success-text { color: var(--text-dim); font-size: 0.95rem; margin-bottom: 15px; line-height: 1.4; }
 
         .hidden { display: none !important; }
 
@@ -451,11 +461,11 @@
         <div id="status-info" class="status-info"></div>
         <div class="inputs-group">
             <div class="input-wrapper">
-                <span class="material-symbols-outlined input-icon" style="color: var(--primary);" aria-hidden="true">trip_origin</span>
+                <span class="material-symbols-outlined input-icon" style="color: #bcbcbc;" aria-hidden="true">trip_origin</span>
                 <input type="text" id="origin" placeholder="Buscando ubicación..." aria-label="Dirección de origen">
             </div>
             <div class="input-wrapper hidden" id="destination-wrapper">
-                <span class="material-symbols-outlined input-icon" style="color: var(--primary);" aria-hidden="true">location_on</span>
+                <span class="material-symbols-outlined input-icon" style="color: #bcbcbc;" aria-hidden="true">trip_origin</span>
                 <input type="text" id="destination" placeholder="¿A dónde vas?" aria-label="Dirección de destino">
             </div>
         </div>
@@ -473,6 +483,9 @@
         <p class="success-text">
             Hemos abierto WhatsApp para que coordines con el chofer. <br>
             <strong>ID de Seguimiento: <span id="lead-id">...</span></strong>
+        </p>
+        <p style="font-size: 12px; font-style: italic; color: var(--text-dim); margin-bottom: 25px;">
+            Confirmar viaje y detalles con operadora
         </p>
         <button class="btn" id="close-success" style="background: var(--primary); color: #000; width: 100%;">
             Nuevo Viaje

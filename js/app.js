@@ -201,10 +201,6 @@ async function validateAddress(address) {
 };
 
 wsBtn.onclick = () => {
-  // Generamos un ID de seguimiento aleatorio para mostrar en la pantalla
-  const trackingId = Math.floor(Math.random() * 90000) + 10000;
-  leadIdSpan.textContent = `TX-${trackingId}`;
-
   // Mostramos la capa de éxito
   successLayer.style.display = 'flex';
 };
@@ -334,8 +330,19 @@ nextBtn.onclick = async () => {
       const priceBubble = addMessage(chat, 'bot', priceHTML);
       priceBubble.classList.add('price-highlight');
 
+      // Generamos el ID aquí para que sea consistente en el mensaje y en la UI final
+      const trackingId = Math.floor(Math.random() * 90000) + 10000;
+      leadIdSpan.textContent = `TX-${trackingId}`;
+
       const msg = encodeURIComponent(
-        `Taxi Mendoza\nOrigen: ${originInput.value}\nDestino: ${destInput.value}\nPrecio: $${price}`
+        `🚖 *Nuevo Pedido - Taxi Chat*\n\n` +
+        `🆔 *ID:* TX-${trackingId}\n` +
+        `📍 *Origen:* ${originInput.value}\n` +
+        `🏁 *Destino:* ${destInput.value}\n` +
+        `💰 *Precio estimado:* $${price}\n` +
+        `📏 *Distancia:* ${data.distance.text}\n` +
+        `⏱️ *Tiempo estimado de llegada:* ${data.duration.text}\n\n` +
+        `_Confirmar viaje y detalles con operadora_`
       );
 
       wsBtn.href = `https://wa.me/${config.whatsapp}?text=${msg}`;
