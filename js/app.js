@@ -79,49 +79,24 @@ async function init() {
   originInput.addEventListener('input', () => { originPlace = null; statusInfo.textContent = ""; nextBtn.textContent = 'Continuar'; });
   destInput.addEventListener('input', () => { destinationPlace = null; statusInfo.textContent = ""; nextBtn.textContent = 'Continuar'; });
 
-  // Initialize Google Maps Autocomplete for origin and destination inputs
-  if (maps && maps.places && maps.places.Autocomplete) {
-  // Initialize Google Maps PlaceAutocompleteElement
+  // Initialize Google Maps PlaceAutocompleteElement components
   if (maps && maps.places) {
-    // Definir los límites aproximados de Mendoza (Gran Mendoza)
     const mendozaBounds = new maps.LatLngBounds(
       new maps.LatLng(-33.0512, -68.9665), // Suroeste (Luján de Cuyo/Maipú)
       new maps.LatLng(-32.8125, -68.7300)  // Noreste (Las Heras/Guaymallén)
     );
 
-    const autocompleteOptions = {
-      types: ['address'],
-      componentRestrictions: { country: 'ar' },
-      bounds: mendozaBounds,
-      strictBounds: true // Fuerza a que los resultados estén dentro de los límites definidos
-    };
-    // Configurar los componentes web directamente
     const setupAutocomplete = (el) => {
       el.types = ['address'];
       el.componentRestrictions = { country: 'ar' };
       el.locationRestriction = mendozaBounds;
 
-    const originAutocomplete = new maps.places.Autocomplete(originInput, autocompleteOptions);
-    const destAutocomplete = new maps.places.Autocomplete(destInput, autocompleteOptions);
       el.addEventListener('gmp-placeselect', async (e) => {
         const place = e.detail.place;
-        // En el nuevo API, debemos obtener los campos necesarios explícitamente
         await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location', 'addressComponents', 'id'] });
         
         if (el.id === 'origin') originPlace = place;
         else destinationPlace = place;
-
-    // Optional: Listen for place_changed event if you need to do something when a place is selected
-    originAutocomplete.addListener('place_changed', () => {
-      originPlace = originAutocomplete.getPlace();
-      if (!originPlace.geometry) originPlace = null;
-      if (originPlace && destinationPlace) nextBtn.textContent = 'Cotizar viaje';
-    });
-    destAutocomplete.addListener('place_changed', () => {
-      destinationPlace = destAutocomplete.getPlace();
-      if (!destinationPlace.geometry) destinationPlace = null;
-      if (originPlace && destinationPlace) nextBtn.textContent = 'Cotizar viaje';
-    });
         if (originPlace && destinationPlace) nextBtn.textContent = 'Cotizar viaje';
       });
     };
@@ -129,10 +104,9 @@ async function init() {
     setupAutocomplete(originInput);
     setupAutocomplete(destInput);
   } else {
-    console.warn("Google Maps Places Autocomplete not available. Check API key and 'places' library loading.");
     console.warn("PlaceAutocompleteElement not available.");
   }
-}
+};
 
 themeToggle.onclick = () => {
   document.body.classList.toggle('theme-original');
@@ -183,24 +157,18 @@ backBtn.onclick = () => {
 };
 
 function getAddressLink(place) {
-  if (!place || !place.geometry) return place?.formatted_address || "Ubicación";
-  // Soporte para objeto Place nuevo (formattedAddress) y antiguo (formatted_address)
   const address = place.formattedAddress || place.formatted_address || place.displayName || "Ubicación";
   const components = place.addressComponents || place.address_components || [];
   const location = place.location || place.geometry?.location;
 
-  const components = place.address_components || [];
   const getComp = (type) => components.find(c => c.types.includes(type))?.long_name || "";
 
   const street = getComp("route");
   const number = getComp("street_number");
   const dept = getComp("administrative_area_level_2") || getComp("locality");
 
-  const label = `${street} ${number}${dept ? ', ' + dept : ''}`.trim() || place.formatted_address;
   const label = `${street} ${number}${dept ? ', ' + dept : ''}`.trim() || address;
   
-  const lat = typeof place.geometry.location.lat === 'function' ? place.geometry.location.lat() : place.geometry.location.lat;
-  const lng = typeof place.geometry.location.lng === 'function' ? place.geometry.location.lng() : place.geometry.location.lng;
   if (!location) return label;
 
   const lat = typeof location.lat === 'function' ? location.lat() : location.lat;
@@ -274,7 +242,7 @@ nextBtn.onclick = async () => {
 
     if (!originPlace) return showError("No encontramos esa dirección en Mendoza.");
 
-    originInput.value = originPlace.formatted_address || originPlace.name;
+    originInput.value = originPlace.formattedAddress || originPlace.formatted_address || originPlace.displayName || originPlace.name || "";
     statusInfo.textContent = "";
 
     backBtn.classList.remove('hidden');
@@ -304,7 +272,7 @@ nextBtn.onclick = async () => {
       return showError("El origen y el destino no pueden ser el mismo lugar.");
     }
 
-    destInput.value = destinationPlace.formatted_address || destinationPlace.name;
+    destInput.value = destinationPlace.formattedAddress || destinationPlace.formatted_address || destinationPlace.displayName || destinationPlace.name || "";
     nextBtn.textContent = 'Cotizar viaje';
 
     addMessage(chat, 'user', getAddressLink(destinationPlace));
