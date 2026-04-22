@@ -13,55 +13,94 @@
     
     <style>
         :root {
+            --primary: #e0e0e0; /* Silver / Metallic */
+            --dark: #0f0f0f;   /* Background base */
+            --surface: #1e1e1e; /* Widget background */
+            --light: #2d2d2d;  /* Bot message background */
+            --accent: #25D366;
+            --text: #ffffff;
+            --text-dim: #a0a0a0;
+            --border: #333333;
+            --bg: #000000;
+            --input-bg: #252525;
+            --header-bg: linear-gradient(135deg, #f5f5f5 0%, #b0b0b0 100%);
+            --header-text: #000;
+        }
+
+        /* Tema Original (Amarillo / Classic) */
+        body.theme-original {
             --primary: #fbc02d;
             --dark: #1a1a1a;
+            --surface: #ffffff;
             --light: #f8f9fa;
-            --accent: #25D366;
-            --text: #333;
+            --text: #333333;
+            --text-dim: #666666;
+            --border: #eeeeee;
+            --bg: #f0f2f5;
+            --input-bg: #ffffff;
+            --header-bg: #1a1a1a;
+            --header-text: #fbc02d;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        
         body { 
             font-family: 'Segoe UI', Roboto, system-ui, sans-serif; 
-            background: #f0f2f5; 
+            background: var(--bg); 
             display: flex; 
             justify-content: center; 
             align-items: center; 
-            min-height: 100vh;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
             padding: 15px;
             text-rendering: optimizeSpeed;
         }
 
         #taxi-widget {
             width: 100%;
-            max-width: 420px;
-            background: white;
+            max-width: 380px;
+            max-height: 100%;
+            background: var(--surface);
             border-radius: 24px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.15);
             overflow: hidden;
             display: flex;
             flex-direction: column;
             position: relative; /* Para la pantalla de éxito absoluta */
+            border: 1px solid var(--border);
         }
 
         .chat-header { 
-            background: var(--primary); 
-            padding: 20px; 
+            background: var(--header-bg); 
+            padding: 15px 20px; 
             text-align: center; 
+            color: var(--header-text);
+        }
+
+        .header-title {
             font-weight: 800;
             text-transform: uppercase;
+            font-size: 18px;
+            line-height: 1.2;
+        }
+
+        .header-subtitle {
+            font-size: 12px;
+            font-weight: 600;
+            opacity: 0.8;
+            margin-top: 2px;
         }
 
         .chat-body { 
-            height: 400px; 
+            flex: 1;
+            min-height: 120px;
             overflow-y: auto; 
             overflow-x: hidden;
             padding: 20px; 
             display: flex; 
             flex-direction: column; 
             gap: 12px;
-            background: #ffffff;
+            background: var(--surface);
             overflow-anchor: auto; /* Evita saltos visuales al añadir mensajes (Mejora CLS) */
         }
 
@@ -79,13 +118,13 @@
             to { opacity: 1; transform: translateY(0); } 
         }
 
-        .bot { background: var(--light); align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid #eee; }
-        .user { background: var(--primary); align-self: flex-end; border-bottom-right-radius: 4px; font-weight: 500; }
+        .bot { background: var(--light); align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid var(--border); color: var(--text); }
+        .user { background: var(--primary); align-self: flex-end; border-bottom-right-radius: 4px; font-weight: 500; color: #000; }
 
         .input-area { 
             padding: 20px; 
-            background: #fff;
-            border-top: 1px solid #eee; 
+            background: var(--surface);
+            border-top: 1px solid var(--border); 
             display: flex; 
             flex-direction: column; 
             gap: 12px; 
@@ -94,7 +133,7 @@
         
         .status-info {
             font-size: 12px;
-            color: #666;
+            color: var(--text-dim);
             padding: 0 5px;
             min-height: 18px;
             font-style: italic;
@@ -103,7 +142,9 @@
         input { 
             width: 100%; 
             padding: 14px; 
-            border: 2px solid #eee; 
+            border: 2px solid var(--border); 
+            background: var(--input-bg);
+            color: var(--text);
             border-radius: 12px; 
             font-size: 16px;
             outline: none;
@@ -123,13 +164,13 @@
             left: 12px;
             top: 50%;
             transform: translateY(-50%);
-            color: #666; /* Color del ícono */
+            color: var(--text-dim);
             font-size: 20px;
         }
 
         .btn { 
-            background: var(--dark); 
-            color: white; 
+            background: var(--primary); 
+            color: #000; 
             border: none; 
             padding: 15px; 
             border-radius: 12px; 
@@ -138,32 +179,33 @@
             font-size: 16px;
         }
 
+        #theme-toggle {
+            position: absolute;
+            right: 15px;
+            top: 15px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: inherit;
+            opacity: 0.7;
+            z-index: 10;
+        }
+
+        #theme-toggle .material-symbols-outlined {
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s ease;
+            display: block;
+        }
+
+        body.theme-original #theme-toggle .material-symbols-outlined {
+            transform: rotateY(180deg);
+        }
+
         .swap-container {
             position: relative;
             display: flex;
             flex-direction: column;
             gap: 12px;
         }
-
-        #swap-btn {
-            position: absolute;
-            right: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: white;
-            border: 2px solid #eee;
-            border-radius: 50%;
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            z-index: 5;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            transition: all 0.2s;
-        }
-        #swap-btn:active { transform: translateY(-50%) scale(0.9); }
 
         .btn-ws { 
             background: var(--accent); 
@@ -193,7 +235,7 @@
         #success-layer {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: white;
+            background: var(--surface);
             z-index: 10;
             display: none; /* Se activa por JS */
             flex-direction: column;
@@ -232,9 +274,9 @@
 
         /* DISEÑO DE PRECIO DESTACADO */
         .bubble.bot.price-highlight {
-            background: var(--dark);
+            background: #000000;
             color: white;
-            border: none;
+            border: 1px solid var(--border);
             max-width: 90%;
             width: 100%;
             box-shadow: 0 10px 20px rgba(0,0,0,0.2);
@@ -248,7 +290,27 @@
         }
         .price-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8; margin-bottom: 5px; }
         .price-total { font-size: 32px; font-weight: 900; color: var(--primary); margin: 5px 0; }
-        .price-info { font-size: 12px; opacity: 0.7; }
+        
+        .price-details {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+            border-top: 1px solid rgba(255,255,255,0.15);
+            padding-top: 10px;
+            width: 100%;
+            justify-content: center;
+        }
+        .price-detail-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        .price-detail-item .material-symbols-outlined {
+            font-size: 18px;
+            color: var(--primary);
+        }
 
         /* SKELETON SCREEN */
         .skeleton-bubble {
@@ -278,15 +340,15 @@
 
         .icon-check { font-size: 64px; color: var(--accent); margin-bottom: 20px; }
         .success-title { font-size: 1.5rem; font-weight: 800; margin-bottom: 10px; }
-        .success-text { color: #666; font-size: 0.95rem; margin-bottom: 30px; line-height: 1.4; }
+        .success-text { color: var(--text-dim); font-size: 0.95rem; margin-bottom: 30px; line-height: 1.4; }
 
         .hidden { display: none !important; }
 
         /* FOOTER DE ENLACES */
         .widget-footer {
             padding: 12px 20px;
-            background: #fff;
-            border-top: 1px solid #f0f0f0;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
             display: flex;
             justify-content: center;
             gap: 15px;
@@ -304,8 +366,8 @@
             position: fixed;
             bottom: 25px;
             right: 25px;
-            background: var(--dark);
-            color: white;
+            background: var(--primary);
+            color: #000;
             border: none;
             border-radius: 50px;
             padding: 10px 18px;
@@ -320,12 +382,46 @@
             transition: transform 0.2s;
         }
         .floating-help:hover { transform: scale(1.05); }
+
+        /* MODAL DE FAQ */
+        #faq-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 200;
+            display: none; /* Se activa por JS */
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            backdrop-filter: blur(4px);
+        }
+        .faq-content {
+            background: var(--surface);
+            padding: 30px;
+            border-radius: 24px;
+            max-width: 400px;
+            width: 100%;
+            position: relative;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            animation: fadeIn 0.3s ease;
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+        .faq-item { margin-bottom: 20px; }
+        .faq-question { font-weight: bold; color: var(--primary); display: block; margin-bottom: 5px; font-size: 15px; }
+        .faq-answer { font-size: 14px; color: var(--text-dim); line-height: 1.4; }
+        #close-faq { position: absolute; right: 20px; top: 20px; background: none; border: none; cursor: pointer; color: #999; }
     </style>
 </head>
 <body>
 
 <div id="taxi-widget">
- <div class="chat-header">🚕 TaxiChat</div>
+ <div class="chat-header">
+     <button id="theme-toggle" title="Cambiar tema">
+         <span class="material-symbols-outlined">toggle_on</span>
+     </button>
+     <div class="header-title">TaxiChat</div>
+ </div>
     
     <div class="chat-body" id="chat-content">
         <!-- Esqueletos iniciales -->
@@ -337,14 +433,11 @@
         <div id="status-info" class="status-info"></div>
         <div class="swap-container">
             <div class="input-wrapper">
-                <span class="material-symbols-outlined input-icon" style="color: #4285F4;">trip_origin</span>
+                <span class="material-symbols-outlined input-icon" style="color: var(--primary);">trip_origin</span>
                 <input type="text" id="origin" placeholder="Buscando ubicación...">
             </div>
-            <button id="swap-btn" class="hidden" title="Intercambiar direcciones">
-                <span class="material-symbols-outlined" style="font-size: 20px;">swap_vert</span>
-            </button>
             <div class="input-wrapper hidden" id="destination-wrapper">
-                <span class="material-symbols-outlined input-icon" style="color: #EA4335;">location_on</span>
+                <span class="material-symbols-outlined input-icon" style="color: var(--primary);">location_on</span>
                 <input type="text" id="destination" placeholder="¿A dónde vas?">
             </div>
         </div>
@@ -354,8 +447,6 @@
 
     <div class="widget-footer">
         <a href="#" id="back-btn" class="hidden">Editar datos</a>
-        <a href="#">Términos y condiciones</a>
-        <a href="#">Seguridad</a>
     </div>
 
     <div id="success-layer">
@@ -365,9 +456,34 @@
             Hemos abierto WhatsApp para que coordines con el chofer. <br>
             <strong>ID de Seguimiento: <span id="lead-id">...</span></strong>
         </p>
-        <button class="btn" id="close-success" style="background: #eee; color: #333; width: 100%;">
+        <button class="btn" id="close-success" style="background: var(--primary); color: #000; width: 100%;">
             Nuevo Viaje
         </button>
+    </div>
+</div>
+
+<div id="faq-modal">
+    <div class="faq-content">
+        <button id="close-faq">
+            <span class="material-symbols-outlined">close</span>
+        </button>
+        <h3 style="margin-bottom: 20px; font-weight: 800;">Ayuda y Soporte</h3>
+        <div class="faq-item">
+            <span class="faq-question">¿Cómo pido un taxi?</span>
+            <p class="faq-answer">Ingresa tu origen y destino, el sistema calculará el precio y luego podrás confirmar el viaje directamente por WhatsApp con nuestra central.</p>
+        </div>
+        <div class="faq-item">
+            <span class="faq-question">¿Los precios son finales?</span>
+            <p class="faq-answer">La tarifa mostrada es una estimación precisa basada en la distancia. El chofer confirmará el monto al iniciar el viaje.</p>
+        </div>
+        <button class="btn" style="width: 100%; margin-top: 10px;" onclick="window.open('https://wa.me/5492613871088', '_blank')">
+            Hablar con un operador
+        </button>
+
+        <div style="margin-top: 20px; display: flex; justify-content: center; gap: 15px; font-size: 11px; border-top: 1px solid var(--border); padding-top: 15px;">
+            <a href="#" style="color: #999; text-decoration: none;">Términos y condiciones</a>
+            <a href="#" style="color: #999; text-decoration: none;">Seguridad</a>
+        </div>
     </div>
 </div>
 

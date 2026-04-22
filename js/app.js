@@ -10,12 +10,15 @@ const destInput = document.getElementById('destination');
 const destWrapper = document.getElementById('destination-wrapper');
 const backBtn = document.getElementById('back-btn');
 const nextBtn = document.getElementById('next-btn');
-const swapBtn = document.getElementById('swap-btn');
 const wsBtn = document.getElementById('ws-btn');
 const statusInfo = document.getElementById('status-info');
 const successLayer = document.getElementById('success-layer');
 const leadIdSpan = document.getElementById('lead-id');
 const closeSuccessBtn = document.getElementById('close-success');
+const helpBtn = document.getElementById('help-btn');
+const faqModal = document.getElementById('faq-modal');
+const closeFaqBtn = document.getElementById('close-faq');
+const themeToggle = document.getElementById('theme-toggle');
 
 let state = 0;
 let config, maps;
@@ -31,6 +34,13 @@ if ('requestIdleCallback' in window) {
 }
 
 async function init() {
+  // Cargar tema guardado
+  if (localStorage.getItem('theme') === 'original') {
+    document.body.classList.add('theme-original');
+    const icon = themeToggle.querySelector('.material-symbols-outlined');
+    if (icon) icon.textContent = 'toggle_off';
+  }
+
   config = await loadConfig();
   maps = await loadMaps(config.mapsKey);
 
@@ -103,16 +113,25 @@ async function init() {
   }
 }
 
-swapBtn.onclick = () => {
-  const temp = originInput.value;
-  originInput.value = destInput.value;
-  destInput.value = temp;
+themeToggle.onclick = () => {
+  document.body.classList.toggle('theme-original');
+  const isOriginal = document.body.classList.contains('theme-original');
+  localStorage.setItem('theme', isOriginal ? 'original' : 'silver');
+  const icon = themeToggle.querySelector('.material-symbols-outlined');
+  if (icon) icon.textContent = isOriginal ? 'toggle_off' : 'toggle_on';
+};
 
-  const tempPlace = originPlace;
-  originPlace = destinationPlace;
-  destinationPlace = tempPlace;
+helpBtn.onclick = () => {
+  faqModal.style.display = 'flex';
+};
 
-  if (state === 1) nextBtn.textContent = (originPlace && destinationPlace) ? 'Cotizar viaje' : 'Continuar';
+closeFaqBtn.onclick = () => {
+  faqModal.style.display = 'none';
+};
+
+// Cerrar modal al hacer clic fuera del contenido
+faqModal.onclick = (e) => {
+  if (e.target === faqModal) faqModal.style.display = 'none';
 };
 
 backBtn.onclick = () => {
@@ -120,7 +139,6 @@ backBtn.onclick = () => {
     // Volver de Destino a Origen
     state = 0;
     destWrapper.classList.add('hidden');
-    swapBtn.classList.add('hidden');
     backBtn.classList.add('hidden');
     nextBtn.textContent = 'Continuar';
     // Limpiar burbujas de chat para mantener el hilo limpio
@@ -136,7 +154,6 @@ backBtn.onclick = () => {
     nextBtn.classList.remove('hidden');
     nextBtn.disabled = false;
     nextBtn.textContent = 'Cotizar viaje';
-    swapBtn.classList.remove('hidden');
     // Eliminar la burbuja del precio
     if (chat.lastElementChild.classList.contains('price-highlight')) {
       chat.removeChild(chat.lastElementChild);
@@ -201,7 +218,6 @@ closeSuccessBtn.onclick = () => {
   originInput.value = '';
   destInput.value = '';
   destWrapper.classList.add('hidden');
-  swapBtn.classList.add('hidden');
   wsBtn.style.display = 'none';
   wsBtn.classList.remove('pulse-whatsapp'); // Asegurarse de remover la animación al resetear
   nextBtn.disabled = false;
@@ -238,7 +254,6 @@ nextBtn.onclick = async () => {
     backBtn.classList.remove('hidden');
     addMessage(chat, 'user', getAddressLink(originPlace));
     destWrapper.classList.remove('hidden');
-    swapBtn.classList.remove('hidden');
 
     addMessage(chat, 'bot', '¿A dónde vas?');
     state = 1;
@@ -268,13 +283,12 @@ nextBtn.onclick = async () => {
 
     addMessage(chat, 'user', getAddressLink(destinationPlace));
     nextBtn.disabled = true;
-    swapBtn.classList.add('hidden');
 
     // 1. Mostrar indicador de búsqueda en el chat
     const loadingMsg = addMessage(chat, 'bot', `
       <div style="display: flex; align-items: center; gap: 10px;">
         <div class="radar-small"></div>
-        <span>Buscando conductores disponibles...</span>
+        <span>Buscando conductores...</span>
       </div>
     `);
 
@@ -290,7 +304,7 @@ nextBtn.onclick = async () => {
       loadingMsg.innerHTML = `
         <div style="display: flex; align-items: center; gap: 10px;">
           <div class="radar-small"></div>
-          <span>Buscando el mejor precio para vos...</span>
+          <span>Buscando el mejor precio...</span>
         </div>
       `;
       
@@ -305,7 +319,16 @@ nextBtn.onclick = async () => {
         <div class="price-card">
           <span class="price-label">Tarifa Estimada</span>
           <span class="price-total">$${price}</span>
-          <span class="price-info">Recorrido: ${data.distance.text}</span>
+          <div class="price-details">
+            <div class="price-detail-item">
+              <span class="material-symbols-outlined">route</span>
+              <span>${data.distance.text}</span>
+            </div>
+            <div class="price-detail-item">
+              <span class="material-symbols-outlined">schedule</span>
+              <span>${data.duration.text}</span>
+            </div>
+          </div>
         </div>
       `;
       const priceBubble = addMessage(chat, 'bot', priceHTML);
