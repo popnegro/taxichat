@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Generador Taxi Links</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100 p-6">
+
+  <div class="max-w-md mx-auto bg-white p-6 rounded-2xl shadow">
+
+    <h1 class="text-xl font-bold mb-4">🚖 Generador de Links Taxi</h1>
+
+    <input id="cliente" type="text" placeholder="Nombre del taxi (ej: Taxi Norte)"
+      class="w-full p-3 border rounded-xl mb-3">
+
+    <input id="telefono" type="text" placeholder="Teléfono (ej: 5492611234567)"
+      class="w-full p-3 border rounded-xl mb-3">
+
+    <input id="dominio" type="text" placeholder="Dominio (ej: tudominio.com/taxi.html)"
+      class="w-full p-3 border rounded-xl mb-4">
+
+    <button onclick="generarLink()"
+      class="w-full bg-green-500 text-white p-3 rounded-xl font-bold">
+      Generar link
+    </button>
+
+    <div id="resultado" class="mt-4 hidden">
+      <p class="text-sm text-gray-600 mb-2">Link generado:</p>
+
+      <input id="linkFinal" class="w-full p-2 border rounded mb-2" readonly>
+
+      <button onclick="copiarLink()"
+        class="w-full bg-blue-500 text-white p-2 rounded">
+        Copiar link
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+    function generarLink() {
+      const cliente = document.getElementById("cliente").value;
+      const telefono = document.getElementById("telefono").value;
+      const dominio = document.getElementById("dominio").value;
+
+      if (!cliente || !telefono || !dominio) {
+        alert("Completá todos los campos");
+        return;
+      }
+
+      const clienteEncoded = encodeURIComponent(cliente);
+
+      const link = `${dominio}?cliente=${clienteEncoded}&tel=${telefono}`;
+
+      document.getElementById("resultado").classList.remove("hidden");
+      document.getElementById("linkFinal").value = link;
+    }
+
+    function copiarLink() {
+      const input = document.getElementById("linkFinal");
+      input.select();
+      document.execCommand("copy");
+      alert("Link copiado");
+    }
+  </script>
+
+</body>
+</html>
