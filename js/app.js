@@ -9,6 +9,8 @@ const originInput = document.getElementById('origin');
 const destInput = document.getElementById('destination');
 const destWrapper = document.getElementById('destination-wrapper');
 const backBtn = document.getElementById('back-btn');
+const clearOriginBtn = document.getElementById('clear-origin');
+const clearDestBtn = document.getElementById('clear-destination');
 const nextBtn = document.getElementById('next-btn');
 const wsBtn = document.getElementById('ws-btn');
 const statusInfo = document.getElementById('status-info');
@@ -75,9 +77,38 @@ async function init() {
     originInput.placeholder = "📍 Ingresa origen";
   }
 
+  const updateClearBtn = (input, btn) => {
+    if (input.value.length > 0) btn.classList.add('visible');
+    else btn.classList.remove('visible');
+  };
+
   // Resetear validación al escribir
-  originInput.addEventListener('input', () => { originPlace = null; statusInfo.textContent = ""; nextBtn.textContent = 'Continuar'; });
-  destInput.addEventListener('input', () => { destinationPlace = null; statusInfo.textContent = ""; nextBtn.textContent = 'Continuar'; });
+  originInput.addEventListener('input', () => { 
+    originPlace = null; 
+    statusInfo.textContent = ""; 
+    nextBtn.textContent = 'Continuar'; 
+    updateClearBtn(originInput, clearOriginBtn);
+  });
+  destInput.addEventListener('input', () => { 
+    destinationPlace = null; 
+    statusInfo.textContent = ""; 
+    nextBtn.textContent = 'Continuar'; 
+    updateClearBtn(destInput, clearDestBtn);
+  });
+
+  clearOriginBtn.onclick = () => {
+    originInput.value = '';
+    originPlace = null;
+    updateClearBtn(originInput, clearOriginBtn);
+    originInput.focus();
+  };
+
+  clearDestBtn.onclick = () => {
+    destInput.value = '';
+    destinationPlace = null;
+    updateClearBtn(destInput, clearDestBtn);
+    destInput.focus();
+  };
 
   // Initialize Google Maps Autocomplete for origin and destination inputs
   if (maps && maps.places && maps.places.Autocomplete) {
