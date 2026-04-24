@@ -1,6 +1,9 @@
 export async function saveLead(data) {
   try {
-    const res = await fetch('/api/lead', {
+    // Resolvemos la ruta relativa al script. 
+    // '../api/lead' asume que la API está en la raíz, al mismo nivel que config.json
+    const apiUrl = new URL('../api/lead', import.meta.url);
+    const res = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)

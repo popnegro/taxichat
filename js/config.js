@@ -1,15 +1,23 @@
 export async function loadConfig() {
   try {
-    // Using a relative path for the local config file
-    const res = await fetch('./config.json');
+    // Resolvemos la ruta al JSON global relativa a este script
+    const configUrl = new URL('../config.json', import.meta.url);
+    const res = await fetch(configUrl);
+    
     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-
     const cfg = await res.json();
 
+    // Leemos posibles sobrescrituras desde el HTML (body data attributes)
+    const ds = document.body.dataset;
+
     return {
-      mapsKey: cfg.mapsKey || null,
-      whatsapp: cfg.whatsappNumber || "5492613871088",
-      rates: cfg.rates || { base: 500, perKm: 300 }
+      // Prioridad: Atributo HTML > config.json global > Fallback hardcoded
+      mapsKey: ds.mapsKey || cfg.mapsKey || null,
+      whatsapp: ds.whatsapp || cfg.whatsappNumber || "5492613871088",
+      rates: {
+        base: ds.rateBase ? Number(ds.rateBase) : (cfg.rates?.base || 500),
+        perKm: ds.ratePerKm ? Number(ds.ratePerKm) : (cfg.rates?.perKm || 300)
+      }
     };
 
   } catch (err) {

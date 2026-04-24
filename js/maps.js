@@ -12,9 +12,9 @@ export async function loadMaps(apiKey) {
       };
 
       const s = document.createElement('script');
-      // Agregamos &callback=mapsReady. Sin esto, loading=async dispara onload prematuramente.
-      // Añadimos 'routes' a las librerías para prepararnos para la migración de DistanceMatrix
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,routes&loading=async&callback=mapsReady`;
+      // Cambiamos a v=beta para habilitar las propiedades de los Web Components
+      // Añadimos 'marker' para AdvancedMarkerElement
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=beta&libraries=places,routes,marker&loading=async&callback=mapsReady`;
       s.async = true;
       s.defer = true;
       s.onerror = () => { delete window.mapsReady; reject(); };

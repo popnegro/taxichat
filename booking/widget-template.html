@@ -1,0 +1,83 @@
+<div id="taxi-widget">
+ <div class="chat-header">
+     <!-- El logo se inyectará aquí si se proporciona, o se puede establecer vía CSS -->
+     <img src="" alt="Logo" class="logo hidden" id="header-logo">
+     <div class="header-title" id="header-title"></div>
+     <div class="header-subtitle" id="header-subtitle"></div>
+ </div>
+
+ <div id="map-container" style="height: 0; overflow: hidden; transition: height 0.3s ease;">
+    <div id="map" style="height: 100%; width: 100%;"></div>
+ </div>
+    
+    <div class="chat-body" id="chat-content">
+        <!-- Esqueletos iniciales -->
+        <div class="skeleton-bubble"></div>
+        <div class="skeleton-bubble" style="width: 50%;"></div>
+    </div>
+
+    <div class="input-area">
+        <div id="status-info" class="status-info"></div>
+        <div class="inputs-group">
+            <div class="input-wrapper">
+                <gmp-place-autocomplete id="origin-autocomplete" placeholder="Buscando ubicación..." aria-label="Dirección de origen" strict-bounds="true"></gmp-place-autocomplete>
+                <span class="material-symbols-outlined clear-btn" id="clear-origin" aria-label="Limpiar origen">close</span>
+            </div>
+            <div class="input-wrapper hidden" id="destination-wrapper">
+                <gmp-place-autocomplete id="destination-autocomplete" placeholder="¿A dónde vas?" aria-label="Dirección de destino" strict-bounds="true"></gmp-place-autocomplete>
+                <span class="material-symbols-outlined clear-btn" id="clear-destination" aria-label="Limpiar destino">close</span>
+            </div>
+        </div>
+        <button class="btn" id="next-btn">Continuar</button>
+        <a href="#" class="btn-ws" id="ws-btn" target="_blank">Confirmar en WhatsApp</a>
+    </div>
+
+    <div class="widget-footer">
+        <a href="#" id="back-btn" class="hidden">Editar datos</a>
+    </div>
+
+    <div id="success-layer">
+        <span class="material-symbols-outlined icon-check">check_circle</span>
+        <h2 class="success-title">¡Pedido en camino!</h2>
+        <p class="success-text">
+            Hemos abierto WhatsApp para que coordines con el chofer. <br>
+            <strong>ID de Seguimiento: <span id="lead-id">...</span></strong>
+        </p>
+        <p style="font-size: 12px; font-style: italic; color: var(--text-dim); margin-bottom: 25px;">
+            Confirmar viaje y detalles con operadora
+        </p>
+        <button class="btn" id="close-success" style="background: var(--primary); color: #000; width: 100%;">
+            Nuevo Viaje
+        </button>
+    </div>
+</div>
+
+<div id="faq-modal">
+    <div class="faq-content">
+        <button id="close-faq" aria-label="Cerrar ventana de ayuda">
+            <span class="material-symbols-outlined" aria-hidden="true">close</span>
+        </button>
+        <h3 style="margin-bottom: 20px; font-weight: 800;">Ayuda y Soporte</h3>
+        <div class="faq-item">
+            <span class="faq-question">¿Cómo pido un taxi?</span>
+            <p class="faq-answer">Ingresa tu origen y destino, el sistema calculará el precio y luego podrás confirmar el viaje directamente por WhatsApp con nuestra central.</p>
+        </div>
+        <div class="faq-item">
+            <span class="faq-question">¿Los precios son finales?</span>
+            <p class="faq-answer">La tarifa mostrada es una estimación precisa basada en la distancia. El chofer confirmará el monto al iniciar el viaje.</p>
+        </div>
+        <button class="btn" style="width: 100%; margin-top: 10px;" onclick="window.open('https://wa.me/5492613871088', '_blank')">
+            Hablar con un operador
+        </button>
+
+        <div style="margin-top: 20px; display: flex; justify-content: center; gap: 15px; font-size: 12px; border-top: 1px solid var(--border); padding-top: 15px;">
+            <a href="#" style="color: #bcbcbc; text-decoration: none;">Términos y condiciones</a>
+            <a href="#" style="color: #bcbcbc; text-decoration: none;">Seguridad</a>
+        </div>
+    </div>
+</div>
+
+<button class="floating-help" id="help-btn">
+    <span class="material-symbols-outlined" style="font-size: 20px;" aria-hidden="true">help</span>
+    Ayuda
+</button>
