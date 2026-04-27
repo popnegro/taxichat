@@ -20,14 +20,17 @@ let directionsRenderer; // Nuevo: para dibujar la ruta
 // Función para cargar e inyectar el template HTML
 async function loadAndInjectTemplate() {
   try {
-    const response = await fetch('../partials/widget-template.html');
+    const templateUrl = new URL('../partials/widget-template.html', import.meta.url);
+    const response = await fetch(templateUrl);
     if (!response.ok) throw new Error('Failed to load widget template');
     const templateHtml = await response.text();
     document.body.insertAdjacentHTML('afterbegin', templateHtml); // Insertar al principio del body
+    return true;
   } catch (error) {
     console.error('Error loading widget template:', error);
     // Fallback o mensaje de error si el template falla en cargar
     document.body.innerHTML = '<p style="color: red;">Error al cargar la interfaz. Por favor, recarga la página.</p>';
+    return false;
   }
 }
 
@@ -62,7 +65,8 @@ if ('requestIdleCallback' in window) {
 
 async function init() {
   // 1. Cargar e inyectar el template HTML en el DOM
-  await loadAndInjectTemplate();
+  const templateLoaded = await loadAndInjectTemplate();
+  if (!templateLoaded) return; // Detener si no se pudo cargar la UI
 
   // 2. Ahora que el template está en el DOM, seleccionar todos los elementos
   chat = document.getElementById('chat-content');
@@ -184,11 +188,13 @@ async function init() {
   // Inicializar marcadores (ocultos por defecto)
   if (maps && map) {
     const originImg = document.createElement('img');
-    originImg.src = "https://maps.google.com/mapfiles/ms/icons/green-dot.png";
+    // Usar new URL permite cambiar a '../img/marker-green.png' fácilmente en el futuro
+    originImg.src = new URL('https://maps.google.com/mapfiles/ms/icons/green-dot.png', import.meta.url).href;
     originImg.width = 32;
 
     const destImg = document.createElement('img');
-    destImg.src = "https://maps.google.com/mapfiles/ms/icons/red-dot.png";
+    // La resolución de URL absoluta externa se mantiene igual, pero el patrón es consistente
+    destImg.src = new URL('https://maps.google.com/mapfiles/ms/icons/red-dot.png', import.meta.url).href;
     destImg.width = 32;
 
     // Usamos AdvancedMarkerElement en lugar de Marker
@@ -249,11 +255,17 @@ function customizeHeader() {
   const body = document.body;
   const customTitle = body.dataset.headerTitle || document.title.split('|')[0].trim() || 'TaxiChat';
   const customSubtitle = body.dataset.headerSubtitle || 'Cotizá tu viaje en Mendoza'; // Valor por defecto
-  const customLogoSrc = body.dataset.logoSrc;
+  let customLogoSrc = body.dataset.logoSrc;
 
   if (headerTitleElement) headerTitleElement.textContent = customTitle;
   if (headerSubtitleElement) headerSubtitleElement.textContent = customSubtitle;
+  
   if (customLogoSrc && headerLogoElement) {
+    // Si el path del logo en el HTML es relativo (ej: ../img/logo.png), 
+    // lo resolvemos respecto al script para evitar fallos desde subcarpetas.
+    if (!customLogoSrc.startsWith('http') && !customLogoSrc.startsWith('/')) {
+      customLogoSrc = new URL(customLogoSrc, window.location.origin + window.location.pathname).href;
+    }
     headerLogoElement.src = customLogoSrc;
     headerLogoElement.classList.remove('hidden'); // Mostrar el logo si se proporciona una URL
   }
@@ -421,7 +433,6 @@ nextBtn.onclick = async () => {
 
     destWrapper.classList.remove('hidden'); // Mostrar el campo de destino
     addMessage(chat, 'user', getAddressLink(originPlace));
-    destWrapper.classList.remove('hidden');
 
     addMessage(chat, 'bot', '¿A dónde vas?');
     state = 1;
